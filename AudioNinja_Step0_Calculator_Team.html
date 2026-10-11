@@ -186,11 +186,10 @@ summary { cursor: pointer; font-weight: 600; font-size: 14px; }
     <h3>2. Use Lookup to save typing</h3>
     <ol>
       <li>Type the venue name and city at the top. Type a speaker model inside each cluster that has one.</li>
-      <li><b>Paste a search result into a cluster:</b> open <i>Paste spec text or load a file</i> under any cluster, paste the specs from a web page or data sheet (or load a .txt, .csv, .md, .json or .html file), and press <b>Read specs</b>. It picks out RMS or continuous watts, sensitivity, max SPL, coverage and (for subs) the pattern, and shows the matched lines under Results so you can check them. PDFs cannot be read here: copy the spec table out of the PDF and paste it.</li>
       <li><b>One lookup entry:</b> fill the four lines in the <b>Lookup entry</b> box: <i>Venue:</i> a name and city or a description such as <i>covered basketball court, Valenzuela City</i>; <i>Sound system:</i> for example <i>2x Mackie Thump212XT tops + 2x Mackie Thump118S subs</i>, or leave it blank to ask the AI for the installed system; <i>Application:</i> Full range music, Acoustic or Speech only; <i>Delay approach:</i> Ideal or Budget. The Application and Delay approach lines set the selectors, and the selectors update the lines.</li>
-      <li><b>Ask AI to look up the venue and sound system:</b> reads the entry, fills every speaker it finds in the built-in table straight away (quantity and manufacturer specs, offline, no extra button), then copies a request for the venue and anything not in the table and opens your AI chat. Send it, copy the AI's whole reply, come back and press <b>Paste AI reply and fill</b>. Models in the built-in table keep their data sheet specs, not the AI's numbers. Undo import reverts everything.</li>
+      <li><b>Ask AI to look up the venue and sound system:</b> reads the entry, fills every speaker it finds in the built-in table straight away (quantity and manufacturer specs, offline, no extra button), then copies a request for the venue and anything not in the table and opens your AI chat. Send it, copy the AI's whole reply, come back and press <b>Paste AI reply and fill</b>. Models in the built-in table keep their data sheet specs, not the AI's numbers. If the reply fills the speakers but not the room size and ceiling height, the app says so; press <b>Ask AI for the venue details only</b> for a request that asks only for the room, with typical figures marked "estimated" when nothing is published. Undo import reverts everything.</li>
       <li><b>Job log:</b> when every item in the CalTemp sign-off is ticked, <b>Save signed-off job to the log</b> stores the inputs and the Step 0 estimates. Each saved job then needs a calibration report: the final delays in the DSP, the measured front, middle and back SPL, the practical adjustments and the deviations. The log compares predicted with measured (delays in ms, level drops against the front row in dB) and can be downloaded as JSON or CSV or imported on another device. It is stored in this browser only, so download a copy.</li>
-      <li>Each cluster has its own speaker buttons. <b>Ask AI about this speaker</b> copies a web-search request for the model typed in that cluster and opens your AI chat (choose Claude, ChatGPT or Gemini under <b>AI chat to open for lookups</b>). Send it, copy the AI's whole reply, come back and press <b>Import AI result for this speaker</b>: it reads your clipboard and fills only that cluster (or paste the reply into the box that opens if your browser blocks the clipboard). <b>Fill from built-in table</b> fills instantly and offline when the model is in the table. Anything not found stays blank so you can type it. Filled fields get a blue edge: they are unverified until you confirm them.</li>
+      <li>Each cluster has its own speaker buttons. <b>Ask AI to suggest another speaker</b> copies a web-search request that describes the cluster's role, the venue, the throw, the target and the current speaker (and, for the Mains, how many dB louder per box the 40 dB front-row headroom needs at 2 boxes or fewer), asking the AI for one better-fitting model with its full spec sheet and feature set, and opens your AI chat (choose Claude, ChatGPT or Gemini under <b>AI chat to open for lookups</b>). Send it, copy the AI's whole reply, come back and press <b>Import AI result for this speaker</b>: it reads your clipboard and replaces the speaker in that cluster with the suggestion (model, watts, sensitivity, peak, coverage), keeping the quantity, and puts the feature set and runner-ups in the lookup notes (if your browser blocks the clipboard, paste the reply into the Import lookup data box in the Lookup section and press Fill fields; it still fills that speaker). <b>Fill from built-in table</b> fills instantly and offline when the model is in the table. Anything not found stays blank so you can type it. Filled fields get a blue edge: they are unverified until you confirm them.</li>
       <li>No AI key is needed or stored. The page cannot call an AI itself, so the AI step always happens in your own AI chat. If your browser blocks reading the clipboard, paste the reply into <b>Import lookup data</b> and press <b>Fill fields</b>.</li>
       <li><b>Undo import</b> restores your values from before the last lookup. Always check the sources shown under Results.</li>
     </ol>
@@ -633,7 +632,7 @@ function model(i) {
     var head = '<div class="cl-head"><span class="cl-name">' + c.name + '</span>' +
       (c.mirror ? '<label class="chk" for="mirror"><input id="mirror" type="checkbox" checked> Same as FOH-L</label>' : '') + (c.mirror2 ? '<label class="chk" for="mirror2"><input id="mirror2" type="checkbox" checked> Same as Delay L (same distance too)</label>' : '') + '</div>';
     var mdl = '<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(12rem,1fr));margin-top:6px"><label class="f" for="' + k + '-model"><span>Speaker model</span><input id="' + k + '-model" type="text" autocomplete="off" placeholder="for the look-up"></label></div>' +
-      '<div class="copyrow" style="margin:6px 0"><button type="button" class="cl-ask" data-k="' + k + '">Ask AI about this speaker</button><a id="' + k + '-web" class="btn" target="_blank" rel="noopener" hidden>Search the speaker</a></div>';
+      '<div class="copyrow" style="margin:6px 0"><button type="button" class="cl-ask" data-k="' + k + '">Ask AI to suggest another speaker</button><a id="' + k + '-web" class="btn" target="_blank" rel="noopener" hidden>Search the speaker</a></div>';
     var dist = (k === 'l' || k === 'r' || k === 'dr') ? '' :
       num(k + '-dist', k === 'dl' ? 'Distance ahead of Mains (blank = auto from the delay approach)' : k === 'ff' ? 'Distance ahead of Mains (blank = auto)' : 'Distance ahead of Mains', (k === 'dl' || k === 'ff') ? 'placeholder="auto"' : '') +
       (c.dir ? '<label class="f" for="' + k + '-dir"><span>Direction</span><select id="' + k + '-dir"><option value="ahead">Ahead</option><option value="behind">Behind</option></select></label>' : '');
@@ -940,6 +939,27 @@ function model(i) {
   var VSCHEMA = '{"venue":"name","type":"indoor or outdoor","room_length_m":0,"room_width_m":0,"ceiling_height_m":0,"audience_width_m":0,"furthest_audience_m":0,"capacity":0,"trim_height_m":0,"foh_spread_m":0,"boundaries":{"floor":"","ceiling":"","stage":"","back":"","left":"","right":""},"sources":[{"field":"","url":"","confidence":"stated or estimated"}],"notes":""}';
   var SPK = function (k) { return '{"cluster":"' + k + '","speaker_model":"","rms_watts":0,"sensitivity_db":0,"peak_spl_db":0,"horizontal_deg":0,"vertical_deg":0' + (k === 'sub' ? ',"pattern":"omni, cardioid or endfire"' : '') + ',"sources":[{"field":"","url":"","confidence":"stated or estimated"}],"notes":""}'; };
   var SPKRULE = 'Use only the manufacturer\'s published specification. rms_watts is the continuous (RMS or AES) power rating of one speaker in watts. sensitivity_db is dB SPL at 1 W and 1 m. peak_spl_db is the maximum peak SPL at 1 m. Coverage angles are the nominal -6 dB horizontal and vertical angles in degrees' + ' (leave them out for a subwoofer). For a subwoofer, set "pattern" only if the model or array is published as omni, cardioid or end-fire.';
+  var SROLE = { l: 'the left main FOH top (the right main mirrors it)', r: 'the right main FOH top', ff: 'the center fill cluster', sub: 'the subwoofers', dl: 'the left delay or fill speaker (the right delay mirrors it)', dr: 'the right delay or fill speaker' };
+  var suggestPrompt = function (target, m) {
+    var mp = function (x) { return x === 'r' ? 'l' : x === 'dr' ? 'dl' : x; }, k = mp(target);
+    var inp = null, res = null; try { inp = read(); res = model(inp); } catch (e) {}
+    var c = inp && inp.clusters && inp.clusters[k] ? inp.clusters[k] : {}, ln = [];
+    var v = $('venueName') ? $('venueName').value.trim() : '';
+    if (v) ln.push('Venue: ' + v);
+    if (inp) {
+      if (inp.venue) ln.push('Venue type: ' + inp.venue + (inp.roomL != null && inp.roomW != null ? ', room about ' + inp.roomL.toFixed(0) + ' x ' + inp.roomW.toFixed(0) + ' m' + (inp.roomH != null ? ', ceiling ' + inp.roomH.toFixed(1) + ' m' : '') : ''));
+      if (res) ln.push('Mains throw: front row ' + res.frowD.toFixed(1) + ' m, furthest audience ' + (inp.far != null ? inp.far.toFixed(1) : '?') + ' m' + (inp.awidth != null ? ', audience width ' + inp.awidth.toFixed(0) + ' m' : '') + '; target ' + res.target + ' dB SPL at unity gain; application: ' + ({ full: 'full range music', acoustic: 'acoustic, no drums or bass', speech: 'speech only' }[inp.app] || 'full range music') + '; ' + (inp.dapp === 'budget' ? 'budget (small venue, limited gear)' : 'ideal design') + '.');
+    }
+    var cur = '';
+    if (m) cur = 'Current speaker in this cluster: ' + m + (c.qty ? ' x' + c.qty : '') + (c.w != null ? ', ' + c.w + ' W RMS' : '') + (c.sens != null ? ', ' + c.sens + ' dB sensitivity' : '') + (c.peak != null ? ', ' + c.peak + ' dB peak' : '') + (k !== 'sub' && c.h != null ? ', ' + c.h + ' x ' + (c.v != null ? c.v : '?') + ' deg' : '') + '.';
+    else cur = 'No speaker is chosen for this cluster yet.';
+    var need = '';
+    var curBox = c.sens != null && c.w != null && c.w > 0 ? c.sens + 10 * Math.log10(c.w) : null;
+    if ((k === 'l') && res && res.hr && res.hr.swap != null && res.hr.swap > 0 && curBox != null) need = 'REQUIREMENT: the front-row headroom goal (' + res.hr.goal + ' dB above the target) is ' + (-res.hr.worst.delta).toFixed(1) + ' dB short with the current speaker. My rule is a point-source cluster of 2 boxes or fewer, so suggest a model whose continuous level at 1 m per box (sensitivity + 10 x log10 of RMS watts) is at least ' + (curBox + res.hr.swap).toFixed(1) + ' dB (the current one is ' + curBox.toFixed(1) + ' dB), at 2 boxes per side or fewer. If no real speaker reaches that, say so in "notes" and suggest the closest one.';
+    else if (curBox != null) need = 'Prefer higher sensitivity than the current speaker (' + c.sens + ' dB) so fewer boxes are needed; I keep a cluster at 2 boxes or fewer.';
+    else need = 'Prefer high sensitivity so a cluster needs 2 boxes or fewer.';
+    return 'Suggest another speaker for my AudioNinja Step 0 Calculator.\nCluster: ' + CLNAME[target] + ' (' + SROLE[target] + ')\n' + (ln.length ? ln.join('\n') + '\n' : '') + cur + '\n' + need + '\n\nUse web search. Find the single best-fitting current production speaker for this role and venue, from the manufacturer\'s own data sheet, and fill in its specs. ' + (k === 'sub' ? 'It must be a subwoofer. ' : 'It must be a full-range or top speaker suited to this cluster\'s coverage; the horizontal coverage should suit the audience width at the front row. ') + 'Do not suggest the speaker I already have. ' + SPKRULE + ' Put the exact brand and model in "speaker_model". In "notes" give the feature set in one short string: powered or passive, frequency response, weight, mounting or rigging, how many per side you recommend, why it fits, and two runner-up models. Reply with one JSON block only. Leave out anything you cannot find and never guess. Give a source URL for each value and mark each as "stated" or "estimated". Shape: ' + SPK(target);
+  };
   var askPrompt = function (target) {
     if (target === 'venue') {
       var v = $('venueName').value.trim();
@@ -947,8 +967,8 @@ function model(i) {
       return 'Lookup for my AudioNinja Step 0 Calculator.\nVenue: ' + v + '\n\nSearch the web for room dimensions, ceiling height, surface materials, capacity and any tech spec or stage plot. Reply with one JSON block only, in meters. Leave out anything you cannot find and never guess. Give a source URL for each value and mark each as "stated" or "estimated". Allowed boundary values: ' + MATKEYS.join(', ') + '. Shape: ' + VSCHEMA;
     }
     var m = $(target + '-model').value.trim();
-    if (!m) { lkmsg('Type the speaker model for the ' + CLNAME[target] + ' cluster first.'); return ''; }
-    return 'Lookup for my AudioNinja Step 0 Calculator.\nCluster: ' + CLNAME[target] + '\nSpeaker model: ' + m + '\n\nUse web search. Find this exact speaker on the manufacturer\'s website and read its published data sheet or spec page first; use a dealer or review page only if the manufacturer does not publish a value, and mark that value "estimated". Put the exact brand and model in "speaker_model". ' + SPKRULE + ' Reply with one JSON block only. Leave out anything you cannot find and never guess. Give a source URL for each value and mark each as "stated" or "estimated". Shape: ' + SPK(target);
+    var sp = suggestPrompt(target, m);
+    return sp;
   };
   var extractPrompt = function (target, txt) {
     var what = target === 'venue' ? 'venue facts (meters; allowed boundary values: ' + MATKEYS.join(', ') + ')' : 'speaker specs for the ' + CLNAME[target] + ' cluster. ' + SPKRULE;
@@ -1014,6 +1034,10 @@ function model(i) {
       var mp = function (x) { return x === 'r' ? 'l' : x === 'dr' ? 'dl' : x; };
       k = forceTarget ? mp(forceTarget) : ['l', 'ff', 'sub', 'dl'].indexOf(o.cluster) >= 0 ? o.cluster : (target && target !== 'venue' ? mp(target) : lastTarget && lastTarget !== 'venue' ? mp(lastTarget) : 'l');
       var nm = CLNAME[k] + ': ';
+      /* a suggestion from the per-speaker import replaces the speaker: old specs must not survive */
+      var nrm = function (x) { return String(x || '').toLowerCase().replace(/[^a-z0-9]/g, ''); };
+      var repl = !!forceTarget && typeof o.speaker_model === 'string' && o.speaker_model.trim() && nrm(o.speaker_model) !== nrm($(k + '-model').value);
+      if (repl) { ['w', 'sens', 'peak', 'h', 'v', 'pat'].forEach(function (f) { var e = $(k + '-' + f); if (e) { e.value = ''; e.classList.remove('lk'); } }); }
       /* stale lookup-filled values from an earlier model must not survive a new lookup; typed values do */
       ['w', 'sens', 'peak', 'h', 'v', 'cfg', 'pat'].forEach(function (f) { var e = $(k + '-' + f); if (e && e.classList.contains('lk')) { e.value = ''; e.classList.remove('lk'); } });
       var cvh = o.horizontal_deg != null ? o.horizontal_deg : (o.coverage && o.coverage.horizontal_deg), cvv = o.vertical_deg != null ? o.vertical_deg : (o.coverage && o.coverage.vertical_deg);
@@ -1022,7 +1046,7 @@ function model(i) {
       put(k + '-peak', o.peak_spl_db, nm + 'Peak SPL', false, 1);
       if (k !== 'sub') { putDeg(k + '-h', cvh, nm + 'Horizontal coverage'); putDeg(k + '-v', cvv, nm + 'Vertical coverage'); }
       if (k === 'sub' && typeof o.pattern === 'string' && PATKEYS[o.pattern.toLowerCase().trim()]) { $('sub-pat').value = PATKEYS[o.pattern.toLowerCase().trim()]; $('sub-pat').classList.add('lk'); changed.push(nm + 'Pattern: ' + PATKEYS[o.pattern.toLowerCase().trim()]); }
-      if (typeof o.speaker_model === 'string' && o.speaker_model.trim() && !$(k + '-model').value.trim()) { $(k + '-model').value = o.speaker_model.trim().slice(0, 80); changed.push(nm + 'Model: ' + o.speaker_model.trim().slice(0, 80)); }
+      if (typeof o.speaker_model === 'string' && o.speaker_model.trim() && (!$(k + '-model').value.trim() || repl)) { $(k + '-model').value = o.speaker_model.trim().slice(0, 80); changed.push(nm + 'Model: ' + o.speaker_model.trim().slice(0, 80)); }
     }
     if (!changed.length) return 0;
     lkSnap = snap;
@@ -1221,7 +1245,7 @@ function model(i) {
       var cands = modelCands(mt);
       if (cands.length > 1) { lkmsg('More than one model matches "' + mt.trim() + '": ' + cands.slice(0, 8).map(function (r) { return r.b + ' ' + r.m; }).join(', ') + '. Type or pick the full model name, then press the button again.'); return; }
       if (mt.trim()) notInTable = '"' + mt.trim() + '" is not in the built-in table yet. ';
-      if (mode === 'table') { lkmsg(mt.trim() ? '"' + mt.trim() + '" is not in the built-in table. Press Ask AI about this speaker to search the web for it.' : 'Type the speaker model first.'); return; }
+      if (mode === 'table') { lkmsg(mt.trim() ? '"' + mt.trim() + '" is not in the built-in table. Use Ask AI to suggest another speaker to search the web.' : 'Type the speaker model first.'); return; }
     }
     var text = askPrompt(target);
     if (!text) return;
@@ -1229,7 +1253,7 @@ function model(i) {
     var ch = CHATS[$('chatSel').value] || CHATS.claude, url = ch[1], enc = encodeURIComponent(text);
     if (/\?q=$/.test(url) && url.length + enc.length <= 7000) url += enc;
     var w = null; try { w = window.open(url, '_blank'); if (w) w.opener = null; } catch (e) {}
-    var tail = ' Paste it into the chat if it is not already there, send it, copy the AI\'s whole reply, then press "Paste AI reply and fill".';
+    var tail = target === 'venue' ? ' Paste it into the chat if it is not already there, send it, copy the AI\'s whole reply, then press "Paste AI reply and fill".' : ' Paste it into the chat if it is not already there, send it, copy the AI\'s whole reply, then press "Import AI result for this speaker" under this cluster.';
     var ta = $('askText');
     var fb = function () { ta.hidden = false; ta.value = text; ta.focus(); ta.select(); lkmsg(notInTable + 'Copy the request below.' + (w ? ' ' + ch[0] + ' opened in a new tab.' : '') + tail); $('imp').open = true; };
     try { navigator.clipboard.writeText(text).then(function () { ta.hidden = true; lkmsg(notInTable + 'Request copied.' + (w ? ' ' + ch[0] + ' opened in a new tab.' : ' Your browser blocked the new tab, so open your AI chat yourself.') + tail); $('imp').open = true; }, fb); } catch (e) { fb(); }
@@ -1249,7 +1273,7 @@ function model(i) {
 
 
   /* updates */
-  var APP_VERSION = '1.19.0', DEFAULT_UPDATE_URL = 'https://raw.githubusercontent.com/AudioninjaProductions/audioninja-step0/main/version.json', UK = 'ninja-upd-v1';
+  var APP_VERSION = '1.20.2', DEFAULT_UPDATE_URL = 'https://raw.githubusercontent.com/AudioninjaProductions/audioninja-step0/main/version.json', UK = 'ninja-upd-v1';
   var updUrl = DEFAULT_UPDATE_URL;
   try { var us = localStorage.getItem(UK); if (us) updUrl = us; } catch (e) {}
   $('verNow').textContent = APP_VERSION; $('updUrl').value = updUrl;
@@ -1486,12 +1510,10 @@ function model(i) {
     b.parentNode.insertBefore(im, b.nextSibling); b.parentNode.insertBefore(tb, im.nextSibling);
     var host = b.closest('[id^="cl-"]') || b.parentNode;
     var msg = document.createElement('p'); msg.className = 'hint'; msg.id = k + '-aimsg'; msg.setAttribute('aria-live', 'polite'); host.appendChild(msg);
-    var d = document.createElement('details'); d.className = 'cl-aipaste'; d.id = k + '-aid';
-    var sm = document.createElement('summary'); sm.textContent = 'Paste the AI reply for this speaker'; d.appendChild(sm);
-    var ta = document.createElement('textarea'); ta.id = k + '-aipaste'; ta.className = 'ta'; ta.rows = 4; ta.placeholder = 'Paste the AI reply here (the JSON block)'; ta.setAttribute('aria-label', 'AI reply for this speaker'); d.appendChild(ta);
-    var row = document.createElement('div'); row.className = 'copyrow';
-    var fb = document.createElement('button'); fb.type = 'button'; fb.className = 'cl-imp2'; fb.setAttribute('data-k', k); fb.textContent = 'Fill this speaker'; row.appendChild(fb); d.appendChild(row); host.appendChild(d);
   });
+  var spkPending = null;
+  $('btn-import').addEventListener('click', function () { if (spkPending) forceTarget = spkPending; }, true);
+  $('btn-import').addEventListener('click', function () { forceTarget = null; spkPending = null; });
   var importSpeaker = function (k, text) {
     var msg = $(k + '-aimsg');
     if (!text || !text.trim()) { if (msg) msg.textContent = 'Nothing to import. Copy the AI reply first.'; return; }
@@ -1501,20 +1523,17 @@ function model(i) {
     try { $('btn-import').click(); } finally { forceTarget = null; }
     var changed = JSON.stringify(getAll()) !== before;
     if (msg) msg.textContent = (changed ? 'Filled this speaker from the AI reply. The new values have a blue edge: unverified until you check them against the data sheet. ' : 'Nothing usable for this speaker was found in that reply. ') + 'Undo import reverts it.';
-    if (changed) { var dd = $(k + '-aid'); if (dd) dd.open = false; }
   };
   document.addEventListener('click', function (e) {
     var im = e.target.closest && e.target.closest('.cl-imp');
     if (im) {
-      var k = im.getAttribute('data-k'), manual = function () { var dd = $(k + '-aid'); if (dd) { dd.open = true; var t = $(k + '-aipaste'); if (t) t.focus(); } var msg = $(k + '-aimsg'); if (msg) msg.textContent = 'Your browser did not allow reading the clipboard. Paste the AI reply in the box below and press Fill this speaker.'; };
+      var k = im.getAttribute('data-k'), manual = function () { spkPending = k; lastTarget = k; $('imp').open = true; $('importBox').focus(); var msg = $(k + '-aimsg'); if (msg) msg.textContent = 'Your browser did not allow reading the clipboard. Paste the AI reply into the Import lookup data box in the Lookup section and press Fill fields. It will fill this speaker.'; };
       try {
         if (!navigator.clipboard || !navigator.clipboard.readText) { manual(); return; }
         navigator.clipboard.readText().then(function (t) { importSpeaker(k, t); }, manual);
       } catch (x) { manual(); }
       return;
     }
-    var i2 = e.target.closest && e.target.closest('.cl-imp2');
-    if (i2) { var k2 = i2.getAttribute('data-k'); importSpeaker(k2, $(k2 + '-aipaste').value); }
   });
   document.addEventListener('click', function (e) {
     var sv = e.target.closest && e.target.closest('.cl-save'); if (sv) { saveModel(sv.getAttribute('data-k')); return; }
@@ -1559,6 +1578,12 @@ function model(i) {
       });
     };
     walk(o, 0);
+    ['dimensions', 'room_dimensions', 'size', 'room_size', 'court_size', 'floor_size', 'floor_dimensions', 'venue_dimensions', 'dimensions_m', 'footprint', 'floor_area_dimensions'].forEach(function (dk) {
+      var dv = out[dk]; if (typeof dv !== 'string' || (out.room_length_m != null && out.room_width_m != null)) return;
+      var lastU = (dv.match(/(ft|feet|foot|m|meters?|metres?)\b[^\d]*$/i) || [])[1] || '', nums = [], re = /(\d+(?:[.,]\d+)?)\s*(ft|feet|foot|'|meters?|metres?|m\b|cm)?/gi, mm;
+      while ((mm = re.exec(dv)) && nums.length < 3) { var u = (mm[2] || lastU || 'm').toLowerCase(), n = parseFloat(mm[1].replace(',', '.')); if (/^(ft|feet|foot|')$/.test(u)) n *= 0.3048; else if (u === 'cm') n /= 100; nums.push(n); }
+      if (nums.length >= 2) { var a = Math.max(nums[0], nums[1]), b = Math.min(nums[0], nums[1]); if (out.room_length_m == null) out.room_length_m = a; if (out.room_width_m == null) out.room_width_m = b; if (nums.length === 3 && out.ceiling_height_m == null) out.ceiling_height_m = nums[2]; }
+    });
     NUMF.forEach(function (f) { if (out[f] != null) out[f] = toNum(out[f], f); });
     if (typeof out.coverage === 'string') { var mm = out.coverage.match(/(\d+(?:\.\d+)?)\D+(\d+(?:\.\d+)?)/); if (mm) { if (out.horizontal_deg == null) out.horizontal_deg = parseFloat(mm[1]); if (out.vertical_deg == null) out.vertical_deg = parseFloat(mm[2]); } delete out.coverage; }
     if (typeof out.type === 'string') { var t = out.type.toLowerCase(); out.type = /outdoor|open.?air|open/.test(t) && !/indoor/.test(t) ? 'outdoor' : /indoor|covered|enclosed|hall|arena|gym/.test(t) ? 'indoor' : out.type; }
@@ -1567,7 +1592,11 @@ function model(i) {
   };
   var _al = applyLookup; applyLookup = function (o, t) { return _al(normLookup(o), t); };
   var _done = done; done = function (n) {
-    if (n) { _done(n); return; }
+    if (n) {
+      _done(n);
+      if (!forceTarget && ($('venue').value === 'indoor') && !$('roomL').value && !$('roomW').value && !$('roomH').value) lkmsg($('lkmsg').textContent + ' The reply had no room size or ceiling height, so the venue fields are still blank. Press "Ask AI for the venue details only", or type them.');
+      return;
+    }
     lkmsg('Nothing usable was found. The reply needs numbers under keys like room_length_m, room_width_m, ceiling_height_m (meters) or rms_watts, sensitivity_db, peak_spl_db. Use the Copy request for AI chat button so the AI answers in the right shape, or paste the reply again.');
   };
 
@@ -1584,16 +1613,18 @@ function model(i) {
     '"boundaries":{"floor":"","ceiling":"","stage":"","back":"","left":"","right":""},' +
     '"clusters":{"l":' + CSCHEMA + ',"ff":' + CSCHEMA + ',"sub":{"speaker_model":"","quantity":0,"rms_watts":0,"peak_spl_db":0,"config":"lr or mono","pattern":"omni, cardioid or endfire"},"dl":' + CSCHEMA + '},' +
     '"sources":[{"field":"","url":"","confidence":"stated or estimated"}],"notes":""}';
+  var vOnly = false;
   var fullPrompt = function () {
     var v = $('venueName').value.trim();
     if (!v) { lkmsg('Type the venue name and city first, or a description such as "indoor basketball court, Valenzuela".'); return ''; }
+    if (vOnly) return 'Lookup of the VENUE ONLY for my AudioNinja Step 0 Calculator (live sound system design).\nVenue: ' + v + '\n\nUse web search. If this names a specific venue, find it. If it only describes a type of venue, choose one well documented example, name it in "venue", and say so in "notes". Always return room_length_m, room_width_m, ceiling_height_m and furthest_audience_m, plus audience_width_m, capacity and the floor, ceiling, stage, back, left and right wall materials where you can (meters; separate numeric fields, not text like "28 x 15 m"). If a value is not published, use the typical figure for this type of venue (for a standard court, the published standard court size) and mark it "estimated" in "sources". Do not include any speakers. Put a source URL for each value in "sources" and mark each "stated" or "estimated". Allowed boundary values: ' + MATKEYS.join(', ') + '. Reply with ONE JSON block only. Shape: ' + VSCHEMA;
     var sh = $('sysHint') ? $('sysHint').value.trim() : '';
     return 'Lookup for my AudioNinja Step 0 Calculator (live sound system design).\n' +
       'Venue: ' + v + '\n' +
       'Application: ' + ({ full: 'full range music (DJ and live band with drums and bass), so include subwoofers if the system has them', acoustic: 'acoustic, no drums or bass, so leave out "sub"', speech: 'speech only, so leave out "sub"' }[$('app').value] || 'full range music') + '\n' +
       'Sound system: ' + (sh ? 'I want to use: ' + sh + '. Use exactly these models, and look up their specs.' : 'find the venue\'s installed house sound system, if one is published.') + '\n\n' +
       'Do this with web search:\n' +
-      '1. VENUE. If this names a specific venue, find it. If it only describes a type of venue, choose one well documented example, name it in "venue", and say so in "notes". Find room dimensions, ceiling height, audience area, capacity and the main wall, floor and ceiling materials. If the venue is a standard court and only the court type is known, use the published standard court size and mark it "estimated".\n' +
+      '1. VENUE (required, do this first, and never skip it). If this names a specific venue, find it. If it only describes a type of venue, choose one well documented example, name it in "venue", and say so in "notes". Always return room_length_m, room_width_m, ceiling_height_m and furthest_audience_m, plus audience_width_m, capacity and the floor, ceiling, stage, back, left and right wall materials where you can. If a value is not published, use the typical figure for this type of venue (for a standard court, the published standard court size) and mark it "estimated" in "sources". Use separate numeric fields, not a text string like "28 x 15 m".\n' +
       '2. SOUND SYSTEM. Find the speakers by position: "l" = main left/right hang or stack (give quantity PER SIDE; leave out "r", the app mirrors it), "ff" = center cluster, "sub" = subwoofers (total quantity, "config" = lr if stacked with the mains or mono if one center cluster, "pattern" only if published as omni, cardioid or endfire), "dl" = delay or fill speakers (give quantity PER SIDE; leave out "dr", the app mirrors the left delay to the right delay at the same distance, and the same applies if there is only one delay position). Leave out any position the venue does not have.\n' +
       '3. SPECS. For each position use only the manufacturer\'s published specification of one speaker: rms_watts = continuous (RMS or AES) power in watts, sensitivity_db = dB SPL at 1 W and 1 m, peak_spl_db = maximum peak SPL at 1 m, horizontal_deg and vertical_deg = nominal coverage angles (leave out for subs).\n\n' +
       'Rules: reply with ONE JSON block only, no other text. Meters for every length. Numbers must be plain numbers, not text. Leave out anything you cannot find and never guess. Put a source URL for each value in "sources" and mark each "stated" or "estimated". Allowed boundary values: ' + MATKEYS.join(', ') + '.\n' +
@@ -1606,6 +1637,7 @@ function model(i) {
     var inp = document.createElement('input'); inp.id = 'sysHint'; inp.type = 'hidden'; lb.appendChild(inp);
     le.closest('label').parentNode.appendChild(lb);
     var ak = $('lk-ask'); if (ak) ak.textContent = 'Ask AI to look up the venue and sound system';
+    if (ak && !$('lk-ask-venue')) { var vb = document.createElement('button'); vb.type = 'button'; vb.id = 'lk-ask-venue'; vb.textContent = 'Ask AI for the venue details only'; ak.parentNode.insertBefore(vb, ak.nextSibling); vb.addEventListener('click', function () { vOnly = true; try { doAsk('venue'); } finally { vOnly = false; } }); }
   })();
   /* one lookup entry: Venue / Sound system / Application / Delay approach */
   var ENTRY_T = 'Venue: \nSound system: \nApplication: Full range music\nDelay approach: Ideal';
@@ -1817,7 +1849,7 @@ function model(i) {
     if (!txt) { lkmsg('Paste the spec text from a search result or data sheet into the box first, or load a text file.'); return; }
     lastTarget = k;
     var r = specParse(txt), keys = Object.keys(r.o);
-    if (!keys.length) { lkmsg('No watts, sensitivity, SPL or coverage figures were found in that text. Paste the specification table itself, or use Ask AI about this speaker.'); return; }
+    if (!keys.length) { lkmsg('No watts, sensitivity, SPL or coverage figures were found in that text. Paste the specification table itself, or use Ask AI to suggest another speaker.'); return; }
     var body = Object.assign({ cluster: k }, r.o);
     body.sources = [{ field: 'text you pasted', url: null, confidence: 'stated' }];
     body.notes = 'Read from text pasted into the ' + (CLNAME[k] || k) + ' cluster. Matched lines: ' + Object.keys(r.ev).map(function (x) { return x + ': "' + r.ev[x] + '"'; }).join(' | ') + (r.nt.length ? ' ' + r.nt.join(' ') : '');
@@ -1825,24 +1857,6 @@ function model(i) {
     $('btn-undo').hidden = !n;
     lkmsg(n ? 'Read ' + n + ' fields from your text. Check the matched lines under Results before you trust them.' : 'Nothing usable was found in that text.');
   };
-  document.querySelectorAll('.cl-ask').forEach(function (b) {
-    var k = b.getAttribute('data-k'); if (!k || !$(k + '-model') || $(k + '-paste')) return;
-    var host = b.closest('[id^="cl-"]') || b.parentNode;
-    var d = document.createElement('details'); d.className = 'cl-paste';
-    var sm = document.createElement('summary'); sm.textContent = 'Paste spec text or load a file'; d.appendChild(sm);
-    var ta = document.createElement('textarea'); ta.id = k + '-paste'; ta.className = 'ta'; ta.rows = 4; ta.placeholder = 'Paste the specs from a search result or data sheet'; ta.setAttribute('aria-label', 'Spec text for this cluster'); d.appendChild(ta);
-    var fi = document.createElement('input'); fi.type = 'file'; fi.id = k + '-file'; fi.accept = '.txt,.csv,.md,.json,.html,.htm,.xml,.pdf'; fi.setAttribute('aria-label', 'Load a spec file for this cluster'); d.appendChild(fi);
-    var row = document.createElement('div'); row.className = 'copyrow';
-    [['Read specs', 'off']].forEach(function (x) { var bt = document.createElement('button'); bt.type = 'button'; bt.className = 'cl-parse'; bt.setAttribute('data-k', k); bt.setAttribute('data-m', x[1]); bt.textContent = x[0]; row.appendChild(bt); });
-    d.appendChild(row); host.appendChild(d);
-  });
-  document.addEventListener('click', function (e) { var bt = e.target.closest && e.target.closest('.cl-parse'); if (bt && !bt.disabled) parseCluster(bt.getAttribute('data-k')); });
-  document.addEventListener('change', function (e) {
-    var el = e.target; if (!el || el.type !== 'file' || !/-file$/.test(el.id)) return;
-    var k = el.id.replace(/-file$/, '');
-    readFileText(el.files && el.files[0], function (s) { $(k + '-paste').value = s.slice(0, 60000); lkmsg('File loaded. Press Read specs.'); });
-  });
-
   /* Clear all also wipes the lookup helpers: sound system box, pasted text and files, import box, markers, undo */
   $('btn-clear').addEventListener('click', function () {
     if ($('sysHint')) $('sysHint').value = '';
