@@ -181,12 +181,11 @@ summary { cursor: pointer; font-weight: 600; font-size: 14px; }
     <h3>2. Use Lookup to save typing</h3>
     <ol>
       <li>Type the venue name and city at the top. Type a speaker model inside each cluster that has one.</li>
-      <li><b>Paste a search result into a cluster:</b> open <i>Paste spec text or load a file</i> under any cluster, paste the specs from a web page or data sheet (or load a .txt, .csv, .md, .json or .html file), and press <b>Read specs (offline)</b>. It picks out RMS or continuous watts, sensitivity, max SPL, coverage and (for subs) the pattern, and shows the matched lines under Results so you can check them. <b>Read with AI</b> does the same with your AI key. PDFs cannot be read here: copy the spec table out of the PDF and paste it.</li>
+      <li><b>Paste a search result into a cluster:</b> open <i>Paste spec text or load a file</i> under any cluster, paste the specs from a web page or data sheet (or load a .txt, .csv, .md, .json or .html file), and press <b>Read specs</b>. It picks out RMS or continuous watts, sensitivity, max SPL, coverage and (for subs) the pattern, and shows the matched lines under Results so you can check them. PDFs cannot be read here: copy the spec table out of the PDF and paste it.</li>
       <li><b>No AI needed for known speakers:</b> type the speakers in the <b>sound system box</b>, for example <i>2x Mackie Thump212XT mains + 2x Mackie Thump118S subs</i>, and press <b>Fill speakers from the sound system box</b>. Models in the built-in table fill their cluster with quantity and manufacturer specs, offline. The same box is also applied after an AI import, so the speakers fill even if the AI reply has none.</li>
-      <li><b>Venue and sound system in one go:</b> type the venue (or a description such as <i>indoor basketball court, Valenzuela</i>) and, if you like, the speakers you want to use. Press <b>Copy request for AI chat</b>, paste it into any AI chat, then paste the reply into <b>Import lookup data</b> and press <b>Fill fields</b>. The room, the mains, center, subs and delay fill are all filled at once, with quantities. Models that are in the built-in table take their specs from the manufacturer data sheet, not from the AI. Undo import reverts everything.</li>
-      <li><b>Ask AI to look up the venue</b> fills the room fields. Each cluster has its own <b>Ask AI about this speaker</b> button, which fills that cluster's RMS watts, sensitivity, peak SPL and coverage angles (and the pattern, for subs, if published). Anything not found stays blank so you can type it. Filled fields get a blue edge: they are unverified until you confirm them.</li>
-      <li>Set up the AI once under <b>AI settings</b>: pick Gemini or Claude, paste your own key, Save. No key? The button copies a request: paste it into any AI chat, then paste the reply into <b>Import lookup data</b>.</li>
-      <li><b>Extract from pasted spec text</b> reads a rider, tech spec or datasheet you paste in. Pick whether the text is about the venue or one of the speaker clusters.</li>
+      <li><b>Venue and sound system in one go:</b> type the venue (or a description such as <i>indoor basketball court, Valenzuela</i>) and, if you like, the speakers you want to use in the sound system box. Press <b>Ask AI to look up the venue and sound system</b>. The request is copied and your AI chat opens. Send it, copy the AI's whole reply, come back and press <b>Paste AI reply and fill</b>. The room, the mains, center, subs and delay fill are all filled at once, with quantities. Models in the built-in table take their specs from the manufacturer data sheet, not from the AI. Undo import reverts everything.</li>
+      <li>Each cluster has its own <b>Ask AI about this speaker</b> button. If the model is in the built-in table it fills instantly and offline. If not, it copies a request and opens your AI chat the same way. Choose Claude, ChatGPT or Gemini under <b>AI chat to open for lookups</b>. Anything not found stays blank so you can type it. Filled fields get a blue edge: they are unverified until you confirm them.</li>
+      <li>No AI key is needed or stored. The page cannot call an AI itself, so the AI step always happens in your own AI chat. If your browser blocks reading the clipboard, paste the reply into <b>Import lookup data</b> and press <b>Fill fields</b>.</li>
       <li><b>Undo import</b> restores your values from before the last lookup. Always check the sources shown under Results.</li>
     </ol>
     <h3>Speaker models (works offline)</h3>
@@ -199,7 +198,7 @@ summary { cursor: pointer; font-weight: 600; font-size: 14px; }
     </ul>
     <h3>Brands reference (works offline)</h3>
     <ul>
-      <li>The <b>Brands</b> tab is a built-in list of loudspeaker and amplifier brands, from vintage to current and OEM drivers and amplifier modules. Search it, or filter by type, segment and status.</li>
+      <li>The <b>Database</b> tab is a built-in list of loudspeaker and amplifier brands, from vintage to current and OEM drivers and amplifier modules. Search it, or filter by type, segment and status.</li>
       <li>The speaker model boxes in Clusters suggest brand names as you type.</li>
       <li><b>Update database</b> downloads newer brands and models from the repository when you are online and keeps it in this browser. <b>Use built-in copy</b> goes back. The list is a reference, not a spec sheet, and ownership and status change over time.</li>
     </ul>
@@ -215,8 +214,7 @@ summary { cursor: pointer; font-weight: 600; font-size: 14px; }
     <h3>Good to know</h3>
     <ul>
       <li>Everything is a free-field estimate. Real rooms, especially reflective ones, will differ. Power and electrical draw are not checked.</li>
-      <li>Your inputs, AI key and settings are saved in this browser on this computer only.</li>
-      <li>Keys go only to the provider you choose. Do not save a key on a shared computer.</li>
+      <li>Your inputs and settings are saved in this browser on this computer only.</li>
       <li>Coverage reach geometry is an extension of the Scrolls, not a Scrolls formula. Flag anything that should change in AudioNinjaScrolls.</li>
     </ul>
     <h3>Updates</h3>
@@ -270,30 +268,17 @@ summary { cursor: pointer; font-weight: 600; font-size: 14px; }
           <button type="button" id="lk-ask">Ask AI to look up the venue</button>
         </div>
         <textarea id="askText" class="ta" readonly hidden></textarea>
-        <p class="hint">Needs internet. "Ask AI" searches the web through your own AI account (settings below) and fills the fields. With no key saved, it copies a request you can paste into any AI chat, and the reply goes into the import box. The button here looks up the venue. Each speaker cluster below has its own model box and its own button, which fills the published specs for that cluster.</p>
-        <details id="aiset">
-          <summary>AI settings <span id="aistat" class="hint"></span></summary>
-          <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(12rem,1fr))">
-            <label class="f" for="aiProv"><span>AI provider</span><select id="aiProv"><option value="gemini">Google Gemini (default)</option><option value="claude">Anthropic Claude</option><option value="manual">Other AI (copy and paste)</option></select></label>
-            <label class="f" for="aiKey"><span>Your API key</span><input id="aiKey" type="password" autocomplete="off" spellcheck="false"></label>
-            <label class="f" for="aiModel"><span>Model (optional)</span><input id="aiModel" type="text" autocomplete="off" spellcheck="false"></label>
-          </div>
-          <label class="chk" style="display:flex;gap:8px;align-items:center;margin:6px 0"><input id="aiSearch" type="checkbox" checked> <span>Use live web search when the provider allows it</span></label>
-          <div class="copyrow"><button type="button" id="aiSave">Save settings</button><button type="button" id="aiForget">Remove key</button><a id="aiGet" class="btn" target="_blank" rel="noopener">Get a key</a></div>
-          <p class="hint" id="aihint"></p>
-          <p class="hint">The key stays in this browser only. It is never written into the file and goes only to the provider you pick. Do not use a key on a shared computer.</p>
-        </details>
+        <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(12rem,1fr))">
+          <label class="f" for="chatSel"><span>AI chat to open for lookups</span><select id="chatSel"><option value="claude">Claude</option><option value="chatgpt">ChatGPT</option><option value="gemini">Gemini</option></select></label>
+        </div>
+        <div class="copyrow"><button type="button" id="btn-paste">Paste AI reply and fill</button></div>
+        <p class="hint">"Ask AI" checks the built-in model table first (works offline). For anything else it copies a ready-made request and opens your AI chat. Send it there, copy the AI's reply, then press "Paste AI reply and fill". The page cannot call an AI by itself, so no key is needed or stored.</p>
         <details id="imp">
           <summary>Import lookup data</summary>
           <textarea id="importBox" class="ta" placeholder="Paste the JSON block the AI sent back"></textarea>
           <div class="copyrow"><button type="button" id="btn-import">Fill fields</button><button type="button" id="btn-undo" hidden>Undo import</button></div>
         </details>
-        <details id="extract">
-          <summary>Extract from pasted spec text</summary>
-          <label class="f" for="extractFor" style="max-width:20rem"><span>What is this text about?</span><select id="extractFor"><option value="venue">The venue</option><option value="l">FOH tops (L and R)</option><option value="ff">Center speaker</option><option value="dl">Delay speaker</option><option value="sub">Subwoofer</option></select></label>
-          <textarea id="extractBox" class="ta" placeholder="Paste a venue tech spec, rider, speaker datasheet or web page text"></textarea>
-          <div class="copyrow"><button type="button" id="btn-extract">Extract with AI</button></div>
-        </details>
+        
         <p class="hint" id="lkmsg" aria-live="polite">Fields the lookup cannot find keep their current values. Use Clear all first for a clean start.</p>
       </fieldset>
 
@@ -889,101 +874,14 @@ function model(i) {
     mirrorSync(); render(); save();
     lkmsg('Restored the values from before the import.');
   });
-  /* AI providers (team build): key lives in localStorage only */
-  var AIK = 'ninja-ai-v1';
-  var AI = { prov: 'gemini', key: '', model: '', search: true };
-  try { var sv = JSON.parse(localStorage.getItem(AIK) || 'null'); if (sv && typeof sv === 'object') { AI.prov = ['gemini', 'claude', 'manual'].indexOf(sv.prov) >= 0 ? sv.prov : 'gemini'; AI.key = String(sv.key || ''); AI.model = String(sv.model || ''); AI.search = sv.search !== false; } } catch (e) {}
-  var DEF = { gemini: 'gemini-2.5-flash', claude: 'claude-sonnet-5-5' };
-  var aiReady = function () { return AI.prov !== 'manual' && AI.key.length > 8; };
-  var aiShow = function () {
-    $('aiProv').value = AI.prov; $('aiKey').value = AI.key; $('aiModel').value = AI.model; $('aiSearch').checked = AI.search;
-    $('aiModel').placeholder = DEF[AI.prov] || '';
-    $('aiKey').disabled = $('aiModel').disabled = AI.prov === 'manual';
-    var g = $('aiGet'); g.hidden = AI.prov === 'manual';
-    g.href = AI.prov === 'claude' ? 'https://console.anthropic.com/settings/keys' : 'https://aistudio.google.com/apikey';
-    $('aihint').textContent = AI.prov === 'gemini' ? 'Free keys come from Google AI Studio. Google may not include live web search on the free tier. If it is refused, the lookup retries from the model\'s own knowledge and says so. Free-tier prompts may be used by Google to improve its products.' :
-      AI.prov === 'claude' ? 'Uses your Anthropic API account (billed separately from a Claude chat subscription). Web search must be enabled for your organization in the Anthropic Console.' :
-      'No key needed. "Ask AI" copies a request; paste it into any AI and paste the reply into the import box.';
-    $('aistat').textContent = aiReady() ? '(' + (AI.prov === 'claude' ? 'Claude' : 'Gemini') + ' key saved)' : '(not set)';
-  };
-  var aiSave = function () {
-    AI.prov = $('aiProv').value; AI.key = $('aiKey').value.trim(); AI.model = $('aiModel').value.trim(); AI.search = $('aiSearch').checked;
-    try { localStorage.setItem(AIK, JSON.stringify(AI)); } catch (e) { lkmsg('Settings could not be saved in this browser, they last until the page closes.'); }
-    aiShow();
-  };
-  $('aiProv').addEventListener('change', function () { AI.prov = $('aiProv').value; AI.key = ''; $('aiKey').value = ''; aiShow(); });
-  $('aiSave').addEventListener('click', function () { aiSave(); lkmsg('AI settings saved in this browser.'); });
-  $('aiForget').addEventListener('click', function () { AI.key = ''; try { localStorage.removeItem(AIK); } catch (e) {} aiShow(); lkmsg('Key removed from this browser.'); });
-
-  var httpErr = function (r, body) {
-    var m = ''; try { var j = JSON.parse(body); m = (j.error && (j.error.message || j.error.type)) || ''; } catch (e) {}
-    var e = new Error(m || ('HTTP ' + r.status)); e.status = r.status; return e;
-  };
-  var tfetch = function (url, opt, ms) { var c = new AbortController(), t = setTimeout(function () { c.abort(); }, ms); opt.signal = c.signal; return fetch(url, opt).then(function (r) { clearTimeout(t); return r; }, function (e) { clearTimeout(t); if (e && e.name === 'AbortError') { var x = new Error('The provider took too long to answer (over 90 seconds).'); x.status = 0; throw x; } throw e; }); };
-  var callGemini = function (prompt, useSearch) {
-    var body = { contents: [{ parts: [{ text: prompt }] }] };
-    if (useSearch) body.tools = [{ google_search: {} }]; else body.generationConfig = { responseMimeType: 'application/json' };
-    return tfetch('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(AI.model || DEF.gemini) + ':generateContent', {
-      method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': AI.key }, body: JSON.stringify(body)
-    }, 90000).then(function (r) { return r.text().then(function (t) { if (!r.ok) throw httpErr(r, t); return JSON.parse(t); }); }).then(function (j) {
-      var c = j.candidates && j.candidates[0], txt = '', urls = [];
-      if (c && c.content && c.content.parts) c.content.parts.forEach(function (p) { if (p.text) txt += p.text; });
-      var ch = c && c.groundingMetadata && c.groundingMetadata.groundingChunks;
-      if (ch) ch.forEach(function (g) { if (g.web && g.web.uri) urls.push(g.web.uri); });
-      if (!txt) throw new Error('The AI returned no text.');
-      return { text: txt, urls: urls, searched: !!useSearch };
-    });
-  };
-  var callClaude = function (prompt, useSearch) {
-    var body = { model: AI.model || DEF.claude, max_tokens: 3000, messages: [{ role: 'user', content: prompt }] };
-    if (useSearch) body.tools = [{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 }];
-    return tfetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST', headers: { 'content-type': 'application/json', 'x-api-key': AI.key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' }, body: JSON.stringify(body)
-    }, 90000).then(function (r) { return r.text().then(function (t) { if (!r.ok) throw httpErr(r, t); return JSON.parse(t); }); }).then(function (j) {
-      var txt = '', urls = [];
-      (j.content || []).forEach(function (blk) {
-        if (blk.type === 'text' && blk.text) txt += blk.text;
-        if (blk.type === 'web_search_tool_result' && Array.isArray(blk.content)) blk.content.forEach(function (x) { if (x && x.url) urls.push(x.url); });
-      });
-      if (!txt) throw new Error('The AI returned no text.');
-      return { text: txt, urls: urls, searched: !!useSearch };
-    });
-  };
-  var aiCall = function (prompt, wantSearch) {
-    var fn = AI.prov === 'claude' ? callClaude : callGemini;
-    var s = wantSearch && AI.search;
-    return fn(prompt, s).catch(function (e) {
-      if (s && (e.status === 400 || e.status === 403 || e.status === 404)) {
-        return fn(prompt, false).then(function (r) { r.fallback = true; return r; });
-      }
-      throw e;
-    });
-  };
-  var aiErr = function (e) {
-    var s = e && e.status;
-    if (s === 401 || s === 403) return 'The provider rejected the key. Check it in AI settings.';
-    if (s === 429) return 'Rate limit or quota reached for this key. Wait a bit or check the plan.';
-    if (e && /Failed to fetch|NetworkError|Load failed/i.test(e.message || '')) return 'Could not reach the provider. Check the internet connection, and that the page is not blocked by a network filter.';
-    return 'The AI call failed: ' + String((e && e.message) || 'unknown error').slice(0, 160);
-  };
-  var runAI = function (prompt, wantSearch, btn, busyMsg, target) {
-    btn.disabled = true; lkmsg(busyMsg);
-    aiCall(prompt, wantSearch).then(function (r) {
-      var o = parseLoose(r.text);
-      if (o && typeof o === 'object' && !Array.isArray(o)) {
-        var have = Array.isArray(o.sources) ? o.sources : [];
-        r.urls.slice(0, 6).forEach(function (u) { if (!have.some(function (s) { return s && s.url === u; })) have.push({ field: 'web search result', url: u, confidence: 'estimated' }); });
-        o.sources = have;
-      }
-      var n = applyLookup(o, target);
-      done(n);
-      if (n && r.fallback) lkmsg('Filled ' + n + ' fields from the model\'s own knowledge. Live web search was refused for this key, so treat every value as a guess to verify.');
-    }).catch(function (e) {
-      lkmsg(e && e.message === 'json' || e instanceof SyntaxError ? 'The AI did not return usable data. Try again, or use the copy-and-paste route.' : aiErr(e));
-    }).then(function () { btn.disabled = false; });
-  };
+  /* lookups: model table first, then a copied request and an AI chat tab. No key, no API calls. */
+  var tfetch = function (url, opt, ms) { var c = new AbortController(), t = setTimeout(function () { c.abort(); }, ms); opt.signal = c.signal; return fetch(url, opt).then(function (r) { clearTimeout(t); return r; }, function (e) { clearTimeout(t); throw e; }); };
+  var CHATS = { claude: ['Claude', 'https://claude.ai/new?q='], chatgpt: ['ChatGPT', 'https://chatgpt.com/?q='], gemini: ['Gemini', 'https://gemini.google.com/app'] };
+  var CHK = 'ninja-chat-v1';
+  try { var cv = localStorage.getItem(CHK); if (cv && CHATS[cv]) $('chatSel').value = cv; } catch (e) {}
+  $('chatSel').addEventListener('change', function () { try { localStorage.setItem(CHK, $('chatSel').value); } catch (e) {} });
   var notInTable = '';
-  var doAsk = function (target, btn) {
+  var doAsk = function (target) {
     notInTable = '';
     if (target !== 'venue') {
       var mt = $(target + '-model') ? $(target + '-model').value : '', hit = modelFind(mt);
@@ -998,29 +896,35 @@ function model(i) {
       }
       var cands = modelCands(mt);
       if (cands.length > 1) { lkmsg('More than one model matches "' + mt.trim() + '": ' + cands.slice(0, 8).map(function (r) { return r.b + ' ' + r.m; }).join(', ') + '. Type or pick the full model name, then press the button again.'); return; }
-      if (mt.trim() && !aiReady()) notInTable = '"' + mt.trim() + '" is not in the built-in table yet. ';
+      if (mt.trim()) notInTable = '"' + mt.trim() + '" is not in the built-in table yet. ';
     }
     var text = askPrompt(target);
     if (!text) return;
     lastTarget = target;
-    if (aiReady()) { runAI(text, true, btn, 'Asking ' + (AI.prov === 'claude' ? 'Claude' : 'Gemini') + ' to search...', target); return; }
+    var ch = CHATS[$('chatSel').value] || CHATS.claude, url = ch[1], enc = encodeURIComponent(text);
+    if (/\?q=$/.test(url) && url.length + enc.length <= 7000) url += enc;
+    var w = null; try { w = window.open(url, '_blank'); if (w) w.opener = null; } catch (e) {}
+    var tail = ' Paste it into the chat if it is not already there, send it, copy the AI\'s whole reply, then press "Paste AI reply and fill".';
     var ta = $('askText');
-    var fb = function () { ta.hidden = false; ta.value = text; ta.focus(); ta.select(); lkmsg(notInTable + 'Select and copy the request below, then paste it into your AI chat.'); };
-    try { navigator.clipboard.writeText(text).then(function () { ta.hidden = true; lkmsg(notInTable + 'Copied. Paste it into your AI chat, then paste the reply into the import box. Add a key in AI settings to skip this step.'); $('imp').open = true; }, fb); } catch (e) { fb(); }
+    var fb = function () { ta.hidden = false; ta.value = text; ta.focus(); ta.select(); lkmsg(notInTable + 'Copy the request below.' + (w ? ' ' + ch[0] + ' opened in a new tab.' : '') + tail); $('imp').open = true; };
+    try { navigator.clipboard.writeText(text).then(function () { ta.hidden = true; lkmsg(notInTable + 'Request copied.' + (w ? ' ' + ch[0] + ' opened in a new tab.' : ' Your browser blocked the new tab, so open your AI chat yourself.') + tail); $('imp').open = true; }, fb); } catch (e) { fb(); }
   };
-  $('lk-ask').addEventListener('click', function () { doAsk('venue', $('lk-ask')); });
-  document.addEventListener('click', function (e) { var b = e.target.closest && e.target.closest('.cl-ask'); if (b && !b.disabled) doAsk(b.getAttribute('data-k'), b); });
-  $('btn-extract').addEventListener('click', function () {
-    var txt = $('extractBox').value.trim(), tg = $('extractFor').value;
-    if (!txt) { lkmsg('Paste some spec text first.'); return; }
-    if (!aiReady()) { lkmsg('Add your API key in AI settings first, or paste this text into any AI chat with the copied request.'); $('aiset').open = true; return; }
-    runAI(extractPrompt(tg, txt), false, $('btn-extract'), 'The AI is reading the text...', tg);
+  $('lk-ask').addEventListener('click', function () { doAsk('venue'); });
+  document.addEventListener('click', function (e) { var b = e.target.closest && e.target.closest('.cl-ask'); if (b && !b.disabled) doAsk(b.getAttribute('data-k')); });
+  $('btn-paste').addEventListener('click', function () {
+    var manual = function () { $('imp').open = true; $('importBox').focus(); lkmsg('Your browser did not allow reading the clipboard. Paste the AI reply into the box below, then press Fill fields.'); };
+    try {
+      if (!navigator.clipboard || !navigator.clipboard.readText) { manual(); return; }
+      navigator.clipboard.readText().then(function (t) {
+        if (!t || !t.trim()) { lkmsg('The clipboard is empty. Copy the AI reply first.'); return; }
+        $('importBox').value = t; $('btn-import').click();
+      }, manual);
+    } catch (e) { manual(); }
   });
-  aiShow();
 
 
   /* updates */
-  var APP_VERSION = '1.6.0', DEFAULT_UPDATE_URL = 'https://raw.githubusercontent.com/AudioninjaProductions/audioninja-step0/main/version.json', UK = 'ninja-upd-v1';
+  var APP_VERSION = '1.7.0', DEFAULT_UPDATE_URL = 'https://raw.githubusercontent.com/AudioninjaProductions/audioninja-step0/main/version.json', UK = 'ninja-upd-v1';
   var updUrl = DEFAULT_UPDATE_URL;
   try { var us = localStorage.getItem(UK); if (us) updUrl = us; } catch (e) {}
   $('verNow').textContent = APP_VERSION; $('updUrl').value = updUrl;
@@ -1267,21 +1171,6 @@ function model(i) {
   });
   dbInfo(); mRender();
 
-  /* always-available manual route: copy the lookup request for any AI chat */
-  var copyReq = function (target) {
-    var text = askPrompt(target); if (!text) return;
-    lastTarget = target;
-    var ta = $('askText');
-    var fb = function () { ta.hidden = false; ta.value = text; ta.focus(); ta.select(); lkmsg('Select and copy the request below, paste it into your AI chat, then paste the reply into Import lookup data and press Fill fields.'); $('imp').open = true; };
-    try { navigator.clipboard.writeText(text).then(function () { ta.hidden = true; lkmsg('Request copied. Paste it into any AI chat, then paste the reply into Import lookup data below and press Fill fields.'); $('imp').open = true; }, fb); } catch (x) { fb(); }
-  };
-  var mkCopy = function (after, target) {
-    var c = document.createElement('button'); c.type = 'button'; c.className = 'cl-copy'; c.setAttribute('data-t', target); c.textContent = 'Copy request for AI chat';
-    after.parentNode.insertBefore(c, after.nextSibling);
-  };
-  mkCopy($('lk-ask'), 'venue');
-  document.querySelectorAll('.cl-ask').forEach(function (b) { var k = b.getAttribute('data-k'); if (k && $(k + '-model')) mkCopy(b, k === 'r' ? 'l' : k); });
-  document.addEventListener('click', function (e) { var c = e.target.closest && e.target.closest('.cl-copy'); if (c) copyReq(c.getAttribute('data-t')); });
 
   /* tolerant import: AI chats often reply with numbers as text ("28 m", "15 ft"), nested groups or different key names */
   var ALIAS = { length: 'room_length_m', room_length: 'room_length_m', length_m: 'room_length_m', width: 'room_width_m', room_width: 'room_width_m', width_m: 'room_width_m', ceiling_height: 'ceiling_height_m', ceiling: 'ceiling_height_m', ceiling_m: 'ceiling_height_m', height: 'ceiling_height_m', height_m: 'ceiling_height_m', seats: 'capacity', seating_capacity: 'capacity', seating: 'capacity',
@@ -1467,7 +1356,7 @@ function model(i) {
     var box = $('sysHint').value.trim();
     if (!box) { lkmsg('Type the speakers in the sound system box first, for example "2x Mackie Thump212XT mains + 2x Mackie Thump118S subs".'); return; }
     var snap = getAll(), n = applySys(false);
-    if (!n) { lkmsg('None of those models are in the built-in table yet. Use Copy request for AI chat, or type the model in a cluster and save it with its specs.'); return; }
+    if (!n) { lkmsg('None of those models are in the built-in table yet. Use Ask AI to look up the venue and sound system, or type the model in a cluster and save it with its specs.'); return; }
     lkSnap = snap; $('btn-undo').hidden = false; mirrorSync(); updateLinks(); render(); save();
     lkmsg('Filled ' + n + ' fields from the sound system box using the built-in manufacturer table (works offline). Undo import reverts.');
   });
@@ -1502,16 +1391,12 @@ function model(i) {
     fr.onerror = function () { lkmsg('That file could not be read. Paste the text instead.'); };
     fr.readAsText(f);
   };
-  var parseCluster = function (k, useAI, btn) {
+  var parseCluster = function (k) {
     var box = $(k + '-paste'), txt = box ? box.value.trim() : '';
     if (!txt) { lkmsg('Paste the spec text from a search result or data sheet into the box first, or load a text file.'); return; }
     lastTarget = k;
-    if (useAI) {
-      if (!aiReady()) { lkmsg('Add your API key in AI settings first, or use Read specs (offline).'); $('aiset').open = true; return; }
-      runAI(extractPrompt(k, txt), false, btn, 'The AI is reading the text...', k); return;
-    }
     var r = specParse(txt), keys = Object.keys(r.o);
-    if (!keys.length) { lkmsg('No watts, sensitivity, SPL or coverage figures were found in that text. Try Read with AI, or paste the specification table.'); return; }
+    if (!keys.length) { lkmsg('No watts, sensitivity, SPL or coverage figures were found in that text. Paste the specification table itself, or use Ask AI about this speaker.'); return; }
     var body = Object.assign({ cluster: k }, r.o);
     body.sources = [{ field: 'text you pasted', url: null, confidence: 'stated' }];
     body.notes = 'Read from text pasted into the ' + (CLNAME[k] || k) + ' cluster. Matched lines: ' + Object.keys(r.ev).map(function (x) { return x + ': "' + r.ev[x] + '"'; }).join(' | ') + (r.nt.length ? ' ' + r.nt.join(' ') : '');
@@ -1527,14 +1412,14 @@ function model(i) {
     var ta = document.createElement('textarea'); ta.id = k + '-paste'; ta.className = 'ta'; ta.rows = 4; ta.placeholder = 'Paste the specs from a search result or data sheet'; ta.setAttribute('aria-label', 'Spec text for this cluster'); d.appendChild(ta);
     var fi = document.createElement('input'); fi.type = 'file'; fi.id = k + '-file'; fi.accept = '.txt,.csv,.md,.json,.html,.htm,.xml,.pdf'; fi.setAttribute('aria-label', 'Load a spec file for this cluster'); d.appendChild(fi);
     var row = document.createElement('div'); row.className = 'copyrow';
-    [['Read specs (offline)', 'off'], ['Read with AI', 'ai']].forEach(function (x) { var bt = document.createElement('button'); bt.type = 'button'; bt.className = 'cl-parse'; bt.setAttribute('data-k', k); bt.setAttribute('data-m', x[1]); bt.textContent = x[0]; row.appendChild(bt); });
+    [['Read specs', 'off']].forEach(function (x) { var bt = document.createElement('button'); bt.type = 'button'; bt.className = 'cl-parse'; bt.setAttribute('data-k', k); bt.setAttribute('data-m', x[1]); bt.textContent = x[0]; row.appendChild(bt); });
     d.appendChild(row); host.appendChild(d);
   });
-  document.addEventListener('click', function (e) { var bt = e.target.closest && e.target.closest('.cl-parse'); if (bt && !bt.disabled) parseCluster(bt.getAttribute('data-k'), bt.getAttribute('data-m') === 'ai', bt); });
+  document.addEventListener('click', function (e) { var bt = e.target.closest && e.target.closest('.cl-parse'); if (bt && !bt.disabled) parseCluster(bt.getAttribute('data-k')); });
   document.addEventListener('change', function (e) {
     var el = e.target; if (!el || el.type !== 'file' || !/-file$/.test(el.id)) return;
     var k = el.id.replace(/-file$/, '');
-    readFileText(el.files && el.files[0], function (s) { $(k + '-paste').value = s.slice(0, 60000); lkmsg('File loaded. Press Read specs (offline) or Read with AI.'); });
+    readFileText(el.files && el.files[0], function (s) { $(k + '-paste').value = s.slice(0, 60000); lkmsg('File loaded. Press Read specs.'); });
   });
   $('dbUpdate').addEventListener('click', function () {
     var mm = $('mMsg'); dbUrl = $('dbUrl').value.trim() || dbUrl;

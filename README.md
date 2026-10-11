@@ -37,17 +37,15 @@ Your inputs and settings are saved in your own browser on your own computer.
 3. **Read the Results.** Check the delay table, levels, flags and defaults. Use **Copy summary** to paste into notes or messages.
 4. **Open CalTemp** for the live calibration sequence. Do not EQ before SPL and time alignment are confirmed, and never boost a null.
 
-## AI setup (for Lookup)
+## AI lookups (no key needed)
 
-Open **AI settings** under Lookup, pick a provider, paste your own key, and Save.
+The app no longer asks for an AI key and never calls an AI itself. **Ask AI** works like this:
 
-| Provider | Notes |
-|---|---|
-| Google Gemini (default) | Free keys from Google AI Studio (aistudio.google.com/apikey). Live web search is generally not on the free tier. If refused, the app retries from the model's own knowledge and warns you that every value is a guess to verify. Google may use free-tier prompts to improve its products. |
-| Anthropic Claude | Your Anthropic API key (console.anthropic.com), billed separately from a Claude chat subscription. Web search must be enabled for your organization. |
-| Other AI (copy and paste) | No key. The app copies a request; paste it into any AI chat, then paste the reply into **Import lookup data**. |
+1. If the speaker model is in the built-in table, the cluster fills instantly and offline from the manufacturer data sheet.
+2. Otherwise it copies a ready-made request and opens your AI chat (Claude, ChatGPT or Gemini, chosen under **AI chat to open for lookups**).
+3. Send the request, copy the AI's whole reply, return to the app and press **Paste AI reply and fill**. If the browser blocks clipboard reading, paste into **Import lookup data** and press **Fill fields**.
 
-Your key stays in your browser only. It is never written into the file and goes only to the provider you pick. Do not save a key on a shared computer.
+Speaker specs can also be read from pasted text or a loaded text file in each cluster (**Read specs**), with no AI.
 
 ## Updates
 
@@ -71,6 +69,7 @@ To update it: edit `brands.json` on GitHub, add brands in the same shape (`n` na
 
 ## Version history
 
+- **1.7.0** AI settings and API keys removed. Ask AI copies the request and opens the chosen AI chat, Paste AI reply and fill brings the reply back. Copy request, Read with AI and Extract with AI buttons removed.
 - **1.6.0** Per-cluster spec paste/file box: paste text from a search result or load .txt/.csv/.md/.json/.html and read watts, sensitivity, max SPL, coverage and sub pattern offline, or with the AI. PDFs must be copy-pasted.
 - **1.5.1** Sound system box fills clusters offline from the model table (button + applied after every AI import); importer finds the speaker list under any heading and with models only.
 - **1.5.0** Venue and sound system in one request and one import: sound system box, combined prompt, Fill fields populates the room and all clusters (quantity, sub setup and pattern). Table models use data sheet specs.

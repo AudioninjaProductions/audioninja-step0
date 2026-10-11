@@ -1,5 +1,5 @@
 {
-  "version": "1.6.0",
+  "version": "1.7.0",
   "url": "https://github.com/AudioninjaProductions/audioninja-step0/blob/main/AudioNinja_Step0_Calculator_Team.html",
-  "notes": "Each cluster has a box to paste spec text from a search result or load a text file, with Read specs (offline) and Read with AI buttons."
+  "notes": "AI settings removed. Ask AI now copies the request and opens your AI chat in one click; Paste AI reply and fill brings the reply back. No key is needed or stored."
 }
