@@ -1,5 +1,5 @@
 {
-  "version": "1.4.0",
+  "version": "1.4.1",
   "url": "https://github.com/AudioninjaProductions/audioninja-step0/blob/main/AudioNinja_Step0_Calculator_Team.html",
-  "notes": "New \"Save this model to the list\" button in every cluster. Saved models fill offline next time and can be copied from the Database tab to add to the shared list."
+  "notes": "New Copy request for AI chat button next to every lookup button, so you can run any lookup in your own AI chat and paste the reply into Import lookup data."
 }

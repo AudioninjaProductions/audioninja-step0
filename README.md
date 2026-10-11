@@ -71,6 +71,7 @@ To update it: edit `brands.json` on GitHub, add brands in the same shape (`n` na
 
 ## Version history
 
+- **1.4.1** Copy request for AI chat button beside each lookup button (venue and every cluster).
 - **1.4.0** Save this model to the list, per cluster, with copy/download of saved models.
 - **1.3.0** Speaker model spec table with offline autofill per cluster, models in Update database, Database tab, Help section on models.
 - **1.2.0** New Brands tab with the offline brand database, search and filters, brand suggestions on the speaker model boxes, and an Update database button. Phone tab row scrolls sideways instead of clipping.
