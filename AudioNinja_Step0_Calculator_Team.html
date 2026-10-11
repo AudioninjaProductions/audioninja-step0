@@ -181,6 +181,7 @@ summary { cursor: pointer; font-weight: 600; font-size: 14px; }
     <h3>2. Use Lookup to save typing</h3>
     <ol>
       <li>Type the venue name and city at the top. Type a speaker model inside each cluster that has one.</li>
+      <li><b>Paste a search result into a cluster:</b> open <i>Paste spec text or load a file</i> under any cluster, paste the specs from a web page or data sheet (or load a .txt, .csv, .md, .json or .html file), and press <b>Read specs (offline)</b>. It picks out RMS or continuous watts, sensitivity, max SPL, coverage and (for subs) the pattern, and shows the matched lines under Results so you can check them. <b>Read with AI</b> does the same with your AI key. PDFs cannot be read here: copy the spec table out of the PDF and paste it.</li>
       <li><b>No AI needed for known speakers:</b> type the speakers in the <b>sound system box</b>, for example <i>2x Mackie Thump212XT mains + 2x Mackie Thump118S subs</i>, and press <b>Fill speakers from the sound system box</b>. Models in the built-in table fill their cluster with quantity and manufacturer specs, offline. The same box is also applied after an AI import, so the speakers fill even if the AI reply has none.</li>
       <li><b>Venue and sound system in one go:</b> type the venue (or a description such as <i>indoor basketball court, Valenzuela</i>) and, if you like, the speakers you want to use. Press <b>Copy request for AI chat</b>, paste it into any AI chat, then paste the reply into <b>Import lookup data</b> and press <b>Fill fields</b>. The room, the mains, center, subs and delay fill are all filled at once, with quantities. Models that are in the built-in table take their specs from the manufacturer data sheet, not from the AI. Undo import reverts everything.</li>
       <li><b>Ask AI to look up the venue</b> fills the room fields. Each cluster has its own <b>Ask AI about this speaker</b> button, which fills that cluster's RMS watts, sensitivity, peak SPL and coverage angles (and the pattern, for subs, if published). Anything not found stays blank so you can type it. Filled fields get a blue edge: they are unverified until you confirm them.</li>
@@ -1019,7 +1020,7 @@ function model(i) {
 
 
   /* updates */
-  var APP_VERSION = '1.5.1', DEFAULT_UPDATE_URL = 'https://raw.githubusercontent.com/AudioninjaProductions/audioninja-step0/main/version.json', UK = 'ninja-upd-v1';
+  var APP_VERSION = '1.6.0', DEFAULT_UPDATE_URL = 'https://raw.githubusercontent.com/AudioninjaProductions/audioninja-step0/main/version.json', UK = 'ninja-upd-v1';
   var updUrl = DEFAULT_UPDATE_URL;
   try { var us = localStorage.getItem(UK); if (us) updUrl = us; } catch (e) {}
   $('verNow').textContent = APP_VERSION; $('updUrl').value = updUrl;
@@ -1469,6 +1470,71 @@ function model(i) {
     if (!n) { lkmsg('None of those models are in the built-in table yet. Use Copy request for AI chat, or type the model in a cluster and save it with its specs.'); return; }
     lkSnap = snap; $('btn-undo').hidden = false; mirrorSync(); updateLinks(); render(); save();
     lkmsg('Filled ' + n + ' fields from the sound system box using the built-in manufacturer table (works offline). Undo import reverts.');
+  });
+
+  /* per cluster: paste spec text or load a text file, read the specs offline (or with the AI if a key is set) */
+  var specParse = function (raw) {
+    var t = String(raw || '').replace(/\r/g, '').replace(/[ \t ]+/g, ' '), ev = {}, o = {}, nt = [];
+    var num = function (s) { return parseFloat(String(s).replace(/,/g, '')); };
+    var snip = function (m) { var s = m.index, a = Math.max(0, t.lastIndexOf('\n', s) + 1), b = t.indexOf('\n', s + m[0].length); return t.slice(a, b < 0 ? t.length : b).trim().slice(0, 140); };
+    var m;
+    if ((m = t.match(/(?:rms|continuous|cont\.?|aes|nominal)[^\n\d]{0,30}?(\d[\d,]*(?:\.\d+)?)\s*(?:w\b|watts?)/i)) || (m = t.match(/(\d[\d,]*(?:\.\d+)?)\s*(?:w\b|watts?)\s*(?:rms|continuous|cont\.?|aes)/i))) { o.rms_watts = num(m[1]); ev.rms_watts = snip(m); }
+    else if ((m = t.match(/program(?:me)?[^\n\d]{0,30}?(\d[\d,]*(?:\.\d+)?)\s*(?:w\b|watts?)/i))) { o.rms_watts = num(m[1]) / 2; ev.rms_watts = snip(m); nt.push('Only programme power (' + num(m[1]) + ' W) was in the text, so RMS is half of that (derived).'); }
+    if ((m = t.match(/sensitivity[^\n\d]{0,50}?(\d{2,3}(?:\.\d+)?)\s*dB/i)) || (m = t.match(/(\d{2,3}(?:\.\d+)?)\s*dB[^\n]{0,25}?1\s*w[^\n]{0,8}?1\s*m/i))) { o.sensitivity_db = num(m[1]); ev.sensitivity_db = snip(m); }
+    var pk = t.match(/(?:max(?:imum)?\.?\s*(?:spl|output|level)|peak\s*(?:spl|output|level)|max\.?\s*peak)[^\n]{0,60}?(\d{3}(?:\.\d+)?)\s*dB/i);
+    if (pk) { o.peak_spl_db = num(pk[1]); ev.peak_spl_db = snip(pk); if (!/peak/i.test(pk[0])) nt.push('The max SPL in the text is not labelled peak. It was used as peak. Check the data sheet.'); }
+    else if ((m = t.match(/continuous[^\n\d]{0,40}?(\d{3}(?:\.\d+)?)\s*dB/i))) { o.peak_spl_db = num(m[1]) + 3; ev.peak_spl_db = snip(m); nt.push('Only a continuous SPL (' + num(m[1]) + ' dB) was in the text, so peak is continuous + 3 dB (derived).'); }
+    if ((m = t.match(/(?:coverage|dispersion|pattern|angle)[^\n\d]{0,40}?(\d{2,3})\s*°?\s*(?:x|×|by)\s*(\d{2,3})/i)) || (m = t.match(/(\d{2,3})\s*°\s*(?:x|×)\s*(\d{2,3})\s*°/i))) { o.horizontal_deg = num(m[1]); o.vertical_deg = num(m[2]); ev.coverage = snip(m); }
+    else { var hh = t.match(/horizontal[^\n\d]{0,40}?(\d{2,3})\s*°?/i), vv = t.match(/vertical[^\n\d]{0,40}?(\d{2,3})\s*°?/i); if (hh) { o.horizontal_deg = num(hh[1]); ev.horizontal = snip(hh); } if (vv) { o.vertical_deg = num(vv[1]); ev.vertical = snip(vv); } }
+    if ((m = t.match(/\b(cardioid|end[- ]?fire|omni(?:directional)?)\b/i))) { o.pattern = /card/i.test(m[1]) ? 'cardioid' : /end/i.test(m[1]) ? 'endfire' : 'omni'; ev.pattern = snip(m); }
+    return { o: o, ev: ev, nt: nt };
+  };
+  var readFileText = function (f, cb) {
+    if (!f) return;
+    if (f.size > 2000000) { lkmsg('That file is over 2 MB. Paste the relevant part of the spec text instead.'); return; }
+    if (/\.pdf$/i.test(f.name) || f.type === 'application/pdf') { lkmsg('PDF files cannot be read here. Open the PDF, select the spec table, copy it and paste it into the text box.'); return; }
+    var fr = new FileReader();
+    fr.onload = function () {
+      var s = String(fr.result || '');
+      if (/\.html?$/i.test(f.name) || /<html|<body|<table/i.test(s.slice(0, 2000))) { s = s.replace(/<\/(td|th)>/gi, ' | ').replace(/<\/(tr|p|li|div|h\d|table)>/gi, '\n').replace(/<br\s*\/?>/gi, '\n'); try { var d = new DOMParser().parseFromString(s, 'text/html'); d.querySelectorAll('script,style').forEach(function (x) { x.remove(); }); s = (d.body ? d.body.innerText || d.body.textContent : s); } catch (e) {} }
+      cb(s);
+    };
+    fr.onerror = function () { lkmsg('That file could not be read. Paste the text instead.'); };
+    fr.readAsText(f);
+  };
+  var parseCluster = function (k, useAI, btn) {
+    var box = $(k + '-paste'), txt = box ? box.value.trim() : '';
+    if (!txt) { lkmsg('Paste the spec text from a search result or data sheet into the box first, or load a text file.'); return; }
+    lastTarget = k;
+    if (useAI) {
+      if (!aiReady()) { lkmsg('Add your API key in AI settings first, or use Read specs (offline).'); $('aiset').open = true; return; }
+      runAI(extractPrompt(k, txt), false, btn, 'The AI is reading the text...', k); return;
+    }
+    var r = specParse(txt), keys = Object.keys(r.o);
+    if (!keys.length) { lkmsg('No watts, sensitivity, SPL or coverage figures were found in that text. Try Read with AI, or paste the specification table.'); return; }
+    var body = Object.assign({ cluster: k }, r.o);
+    body.sources = [{ field: 'text you pasted', url: null, confidence: 'stated' }];
+    body.notes = 'Read from text pasted into the ' + (CLNAME[k] || k) + ' cluster. Matched lines: ' + Object.keys(r.ev).map(function (x) { return x + ': "' + r.ev[x] + '"'; }).join(' | ') + (r.nt.length ? ' ' + r.nt.join(' ') : '');
+    var n = applyLookup(body, k);
+    $('btn-undo').hidden = !n;
+    lkmsg(n ? 'Read ' + n + ' fields from your text. Check the matched lines under Results before you trust them.' : 'Nothing usable was found in that text.');
+  };
+  document.querySelectorAll('.cl-ask').forEach(function (b) {
+    var k = b.getAttribute('data-k'); if (!k || !$(k + '-model') || $(k + '-paste')) return;
+    var host = b.closest('[id^="cl-"]') || b.parentNode;
+    var d = document.createElement('details'); d.className = 'cl-paste';
+    var sm = document.createElement('summary'); sm.textContent = 'Paste spec text or load a file'; d.appendChild(sm);
+    var ta = document.createElement('textarea'); ta.id = k + '-paste'; ta.className = 'ta'; ta.rows = 4; ta.placeholder = 'Paste the specs from a search result or data sheet'; ta.setAttribute('aria-label', 'Spec text for this cluster'); d.appendChild(ta);
+    var fi = document.createElement('input'); fi.type = 'file'; fi.id = k + '-file'; fi.accept = '.txt,.csv,.md,.json,.html,.htm,.xml,.pdf'; fi.setAttribute('aria-label', 'Load a spec file for this cluster'); d.appendChild(fi);
+    var row = document.createElement('div'); row.className = 'copyrow';
+    [['Read specs (offline)', 'off'], ['Read with AI', 'ai']].forEach(function (x) { var bt = document.createElement('button'); bt.type = 'button'; bt.className = 'cl-parse'; bt.setAttribute('data-k', k); bt.setAttribute('data-m', x[1]); bt.textContent = x[0]; row.appendChild(bt); });
+    d.appendChild(row); host.appendChild(d);
+  });
+  document.addEventListener('click', function (e) { var bt = e.target.closest && e.target.closest('.cl-parse'); if (bt && !bt.disabled) parseCluster(bt.getAttribute('data-k'), bt.getAttribute('data-m') === 'ai', bt); });
+  document.addEventListener('change', function (e) {
+    var el = e.target; if (!el || el.type !== 'file' || !/-file$/.test(el.id)) return;
+    var k = el.id.replace(/-file$/, '');
+    readFileText(el.files && el.files[0], function (s) { $(k + '-paste').value = s.slice(0, 60000); lkmsg('File loaded. Press Read specs (offline) or Read with AI.'); });
   });
   $('dbUpdate').addEventListener('click', function () {
     var mm = $('mMsg'); dbUrl = $('dbUrl').value.trim() || dbUrl;

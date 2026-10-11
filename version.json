@@ -1,5 +1,5 @@
 {
-  "version": "1.5.1",
+  "version": "1.6.0",
   "url": "https://github.com/AudioninjaProductions/audioninja-step0/blob/main/AudioNinja_Step0_Calculator_Team.html",
-  "notes": "Speakers typed in the new sound system box now fill their clusters offline from the built-in table (no AI needed), and an AI reply that lists the speakers under any heading or with no specs still fills the clusters."
+  "notes": "Each cluster has a box to paste spec text from a search result or load a text file, with Read specs (offline) and Read with AI buttons."
 }

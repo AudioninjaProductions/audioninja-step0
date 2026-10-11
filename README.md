@@ -71,6 +71,7 @@ To update it: edit `brands.json` on GitHub, add brands in the same shape (`n` na
 
 ## Version history
 
+- **1.6.0** Per-cluster spec paste/file box: paste text from a search result or load .txt/.csv/.md/.json/.html and read watts, sensitivity, max SPL, coverage and sub pattern offline, or with the AI. PDFs must be copy-pasted.
 - **1.5.1** Sound system box fills clusters offline from the model table (button + applied after every AI import); importer finds the speaker list under any heading and with models only.
 - **1.5.0** Venue and sound system in one request and one import: sound system box, combined prompt, Fill fields populates the room and all clusters (quantity, sub setup and pattern). Table models use data sheet specs.
 - **1.4.3** Ambiguous model names list the matches instead of doing nothing; clear message when a model is not in the table; 6 more Mackie Thump models (74 total, models.json 2026.10.12).
