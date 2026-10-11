@@ -1,5 +1,5 @@
 {
-  "version": "1.19.0",
+  "version": "1.20.0",
   "url": "https://github.com/AudioninjaProductions/audioninja-step0/blob/main/AudioNinja_Step0_Calculator_Team.html",
-  "notes": "Per-cluster speaker lookup: Ask AI about this speaker now always runs an AI web search request, Import AI result for this speaker fills only that cluster, Fill from built-in table is the offline option."
+  "notes": "Ask AI to suggest another speaker: per-cluster prompt that carries the venue, throw, target, current speaker and required dB, searches for a better model, and Import AI result replaces the speaker with its specs and feature set."
 }
