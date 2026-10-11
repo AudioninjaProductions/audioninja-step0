@@ -54,6 +54,9 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .right { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .right > section { min-width: 0; }
 #results { display: flex; flex-direction: column; gap: 14px; }
+#joblog { display: none; }
+body[data-view="joblog"] #joblog { display: block; }
+body[data-view="joblog"] #inputs, body[data-view="joblog"] #results, body[data-view="joblog"] #caltemp { display: none; }
 body[data-view="inputs"] #results, body[data-view="inputs"] #caltemp { display: none; }
 body[data-view="results"] #inputs, body[data-view="results"] #caltemp { display: none; }
 body[data-view="caltemp"] #inputs, body[data-view="caltemp"] #results { display: none; }
@@ -78,6 +81,7 @@ body:not([data-view="help"]) #help { display: none; }
   body #inputs { display: flex !important; }
   body[data-view="inputs"] #results { display: flex; }
   body[data-view="caltemp"] #results { display: none !important; }
+  body[data-view="joblog"] #results, body[data-view="joblog"] #caltemp { display: none !important; }
 }
 fieldset { border: 0; margin: 0; padding: 0; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
 legend { padding: 0; margin-bottom: 8px; font-family: var(--display); font-weight: 600; font-size: 18px; letter-spacing: .06em; text-transform: uppercase; border-bottom: 2px solid var(--ink); width: 100%; }
@@ -165,6 +169,7 @@ summary { cursor: pointer; font-weight: 600; font-size: 14px; }
     <button type="button" role="tab" data-tab="caltemp">CalTemp</button>
     <button type="button" role="tab" data-tab="brands">Database</button>
     <button type="button" role="tab" data-tab="help">Help</button>
+    <button type="button" role="tab" data-tab="joblog">Job log</button>
   </nav>
 
   <section id="help" class="card" aria-label="How to use this app">
@@ -184,6 +189,7 @@ summary { cursor: pointer; font-weight: 600; font-size: 14px; }
       <li><b>Paste a search result into a cluster:</b> open <i>Paste spec text or load a file</i> under any cluster, paste the specs from a web page or data sheet (or load a .txt, .csv, .md, .json or .html file), and press <b>Read specs</b>. It picks out RMS or continuous watts, sensitivity, max SPL, coverage and (for subs) the pattern, and shows the matched lines under Results so you can check them. PDFs cannot be read here: copy the spec table out of the PDF and paste it.</li>
       <li><b>One lookup entry:</b> fill the four lines in the <b>Lookup entry</b> box: <i>Venue:</i> a name and city or a description such as <i>covered basketball court, Valenzuela City</i>; <i>Sound system:</i> for example <i>2x Mackie Thump212XT tops + 2x Mackie Thump118S subs</i>, or leave it blank to ask the AI for the installed system; <i>Application:</i> Full range music, Acoustic or Speech only; <i>Delay approach:</i> Ideal or Budget. The Application and Delay approach lines set the selectors, and the selectors update the lines.</li>
       <li><b>Ask AI to look up the venue and sound system:</b> reads the entry, fills every speaker it finds in the built-in table straight away (quantity and manufacturer specs, offline, no extra button), then copies a request for the venue and anything not in the table and opens your AI chat. Send it, copy the AI's whole reply, come back and press <b>Paste AI reply and fill</b>. Models in the built-in table keep their data sheet specs, not the AI's numbers. Undo import reverts everything.</li>
+      <li><b>Job log:</b> when every item in the CalTemp sign-off is ticked, <b>Save signed-off job to the log</b> stores the inputs and the Step 0 estimates. Each saved job then needs a calibration report: the final delays in the DSP, the measured front, middle and back SPL, the practical adjustments and the deviations. The log compares predicted with measured (delays in ms, level drops against the front row in dB) and can be downloaded as JSON or CSV or imported on another device. It is stored in this browser only, so download a copy.</li>
       <li>Each cluster has its own <b>Ask AI about this speaker</b> button. If the model is in the built-in table it fills instantly and offline. If not, it copies a request and opens your AI chat the same way. Choose Claude, ChatGPT or Gemini under <b>AI chat to open for lookups</b>. Anything not found stays blank so you can type it. Filled fields get a blue edge: they are unverified until you confirm them.</li>
       <li>No AI key is needed or stored. The page cannot call an AI itself, so the AI step always happens in your own AI chat. If your browser blocks reading the clipboard, paste the reply into <b>Import lookup data</b> and press <b>Fill fields</b>.</li>
       <li><b>Undo import</b> restores your values from before the last lookup. Always check the sources shown under Results.</li>
@@ -324,6 +330,7 @@ Delay approach: Ideal</textarea></label>
         <div class="grid">
           <label class="f" for="temp"><span>Temperature at mix position</span><input id="temp" type="number" inputmode="decimal" step="any"></label>
           <label class="f" for="target"><span>Target SPL (dB C, Slow)</span><input id="target" type="number" inputmode="decimal" step="any" placeholder="blank = 100"></label>
+          <label class="f" for="hgoal"><span>Headroom goal above target (dB)</span><input id="hgoal" type="number" inputmode="decimal" step="any" placeholder="blank = 40"></label>
           <label class="f" for="far"><span>Furthest audience point</span><input id="far" type="number" inputmode="decimal" step="any"></label>
           <label class="f" for="awidth"><span>Audience width</span><input id="awidth" type="number" inputmode="decimal" step="any" placeholder="blank = room width"></label>
           <label class="f" for="seats"><span>Seating estimate</span><input id="seats" type="number" inputmode="numeric" step="1"></label>
@@ -357,6 +364,7 @@ Delay approach: Ideal</textarea></label>
     <div class="right">
       <section id="results" aria-label="Results"></section>
       <section id="caltemp" class="card" aria-label="CalTemp"></section>
+      <section id="joblog" class="card" aria-label="Job log"></section>
     </div>
   </main>
 </div>
@@ -385,6 +393,7 @@ function model(i) {
   });
   ci.temp = chk(i.temp, -60, 70, 'Temperature', 'C');
   ci.target = chk(i.target, 0, 200, 'Target SPL', 'dB');
+  ci.hgoal = chk(i.hgoal, 0, 100, 'Headroom goal', 'dB');
   ci.far = chk(i.far, 0, 2000, 'Furthest audience point', 'm');
   ci.awidth = chk(i.awidth, 0, 2000, 'Audience width', 'm');
   ci.seats = chk(i.seats, 0, 1e7, 'Seating estimate');
@@ -516,6 +525,20 @@ function model(i) {
     out.midDrop = out.atMid - out.atFront;
     if (out.midDrop < -10) flag('info', 'Middle row drops more than 10 dB', 'Mains-only estimate is ' + out.midDrop.toFixed(1) + ' dB at the middle row against the front row. Per Ninja Calibration Step 4, deploy a time-aligned fill rather than pushing FOH level. Estimate only; confirm by walking the room.');
   }
+  /* headroom: continuous (RMS) ceiling at full rated power against the nominal target SPL assumed at unity gain */
+  (function () {
+    var goal = i.hgoal == null ? 40 : i.hgoal;
+    if (i.hgoal == null) dflt('Headroom goal: 40 dB above the target SPL (Bone\'s preference; the Scrolls\' Step 1 builds in ambient + 40 dB).');
+    var rows = [['Front row', out.frowD, out.atFront], ['Middle row', out.midD, out.atMid], ['Furthest audience', i.far, out.atFar]].map(function (q) {
+      var hr = q[2] == null ? null : q[2] - target;
+      return { label: q[0], dist: q[1], ceil: q[2], headroom: hr, delta: hr == null ? null : hr - goal };
+    });
+    var worst = rows.filter(function (r) { return r.delta != null; }).reduce(function (b, r) { return !b || r.delta < b.delta ? r : b; }, null);
+    var q = out.rows.l.present ? out.rows.l.qty : null, mult = null;
+    if (worst && worst.delta < 0) mult = Math.pow(10, -worst.delta / 10);
+    out.hr = { goal: goal, rows: rows, worst: worst, mult: mult, qty: i.clusters.l.qty };
+    if (worst && worst.delta < 0) flag('info', 'Headroom is below the ' + goal + ' dB goal at the ' + worst.label.toLowerCase(), 'The Mains-only continuous ceiling there is ' + worst.ceil.toFixed(1) + ' dB against a ' + target + ' dB nominal target, ' + worst.headroom.toFixed(1) + ' dB of headroom, ' + (-worst.delta).toFixed(1) + ' dB short. Each doubling of the Mains adds 3 dB.');
+  })();
   if (i.mrow != null && i.far != null && (i.mrow > i.far || i.mrow < out.frowD)) flag('warn', 'Middle row is outside the audience depth', 'The middle row distance (' + i.mrow.toFixed(1) + ' m) should sit between the front row (' + out.frowD.toFixed(1) + ' m) and the furthest point (' + i.far.toFixed(1) + ' m).');
   var dAny = out.rows.dl.present ? out.rows.dl : out.rows.dr.present ? out.rows.dr : null;
   out.dAny = dAny;
@@ -608,7 +631,7 @@ function model(i) {
   var EXAMPLE = {
     app: 'full', dapp: 'ideal', venue: 'indoor', venueName: '', lkEntry: 'Venue: \nSound system: \nApplication: Full range music\nDelay approach: Ideal', dunit: 'm', tunit: 'C', roomL: 20, roomW: 30, roomH: 4,
     'mat-floor': 'concrete', 'mat-ceil': 'concrete', 'mat-stage': 'concrete', 'mat-back': 'concrete', 'mat-left': 'concrete', 'mat-right': 'concrete',
-    temp: 30, target: '', far: 15.24, awidth: '', seats: '', trim: '', spread: '', frow: '', mrow: '',
+    temp: 30, target: '', hgoal: '', far: 15.24, awidth: '', seats: '', trim: '', spread: '', frow: '', mrow: '',
     'l-qty': 1, 'l-w': 650, 'l-sens': '', 'l-peak': 127,
     'r-qty': 1, 'r-w': 650, 'r-sens': '', 'r-peak': 127, mirror: true,
     'ff-qty': 1, 'ff-w': 650, 'ff-sens': '', 'ff-peak': 127, 'ff-dist': 0.61, 'ff-dir': 'ahead',
@@ -658,7 +681,7 @@ function model(i) {
     var mats = {}; MATS.forEach(function (m) { mats[m[0]] = $('mat-' + m[0]).value; });
     return {
       app: $('app').value || 'full', dapp: $('dapp').value || 'ideal', venue: $('venue').value, roomL: d('roomL'), roomW: d('roomW'), roomH: d('roomH'), mats: mats,
-      temp: T, target: val('target'), far: d('far'), awidth: d('awidth'), seats: val('seats'),
+      temp: T, target: val('target'), hgoal: val('hgoal'), far: d('far'), awidth: d('awidth'), seats: val('seats'),
       hAng: val('l-h'), vAng: val('l-v'), trim: d('trim'), spread: d('spread'), frow: d('frow'), mrow: d('mrow'), alignRef: $('alignref') ? $('alignref').value : '',
       clusters: { l: cl('l', false), r: cl('r', false), ff: cl('ff', true), sub: cl('sub', true), dl: cl('dl', true), dr: cl('dr', false) }
     };
@@ -708,6 +731,7 @@ function model(i) {
   var summaryText = '';
   var render = function () {
     var inp = read(), res = model(inp);
+    curSnap = { res: res, inp: inp };
     $('apphint').textContent = res.app === 'full' ? 'All clusters are considered. Delay and Center are predicted from coverage and level.' : 'No sub content: the subs are left out of the estimate. Delay and Center are still predicted from coverage and level.';
     var du = $('dunit').value === 'ft' ? 0.3048 : 1, unit = $('dunit').value;
     $('room').hidden = $('mats').hidden = inp.venue === 'outdoor';
@@ -741,7 +765,11 @@ function model(i) {
         return '<tr><td>' + q[0] + '</td><td class="n">' + dd(q[1]) + '</td><td class="n">' + f1(q[2]) + '</td><td class="n">' + sg(q[2] == null ? null : q[2] - res.target) + '</td><td class="n">' + (q[0] === 'Front row' ? '—' : sg(q[2] == null || res.atFront == null ? null : q[2] - res.atFront)) + '</td></tr>';
       }).join('') +
       (res.dAny ? '<tr><td>Delay position</td><td class="n">' + dd(res.delayDist) + '</td><td class="n">' + f1(res.atDelay) + '</td><td class="n">' + sg(res.atDelay == null ? null : res.atDelay - res.target) + '</td><td class="n">' + sg(res.atDelay == null || res.atFront == null ? null : res.atDelay - res.atFront) + '</td></tr>' : '') +
-      '</tbody></table></div><p class="hint">Free-field inverse-square estimate: 20 log of the distance ratio below the 1 m level. Reflections and room gain will change the real figure.</p>' + chart(res, du, unit) + '</div>';
+      '</tbody></table></div><p class="hint">Free-field inverse-square estimate: 20 log of the distance ratio below the 1 m level. Reflections and room gain will change the real figure.</p>' +
+      '<h3 style="margin:14px 0 6px">Headroom: continuous ceiling versus nominal target</h3><div class="wrap"><table><thead><tr><th>Position</th><th class="n">Continuous ceiling (dB)</th><th class="n">Nominal target at unity gain (dB)</th><th class="n">Headroom (dB)</th><th class="n">Vs ' + res.hr.goal + ' dB goal</th></tr></thead><tbody>' +
+      res.hr.rows.map(function (r) { return '<tr><td>' + r.label + '</td><td class="n">' + f1(r.ceil) + '</td><td class="n">' + res.target + '</td><td class="n">' + sg(r.headroom) + '</td><td class="n">' + (r.delta == null ? '—' : r.delta >= 0 ? 'Meets (' + sg(r.delta) + ')' : 'Short ' + f1(-r.delta)) + '</td></tr>'; }).join('') +
+      '</tbody></table></div>' + (res.hr.mult ? '<p class="note">To reach the ' + res.hr.goal + ' dB goal at the ' + res.hr.worst.label.toLowerCase() + ', ' + (res.hr.mult > 32 ? 'the gap is ' + (-res.hr.worst.delta).toFixed(1) + ' dB, which is not practical to close by adding boxes alone (it would take about ' + res.hr.mult.toFixed(0) + '× the boxes). Shorten the throw (add delays or fills), use higher-sensitivity boxes, or lower the goal. Doubling steps: ' : 'the Mains need about ' + res.hr.mult.toFixed(1) + '× the boxes (' + (res.hr.qty != null ? res.hr.qty + ' per side now, about ' + Math.ceil(res.hr.qty * res.hr.mult - 1e-9) + ' per side needed' : 'per side') + '). Doubling steps: ') + [1, 2, 4, 8, 16].map(function (m) { return '×' + m + ' = ' + sg(res.hr.worst.delta + 10 * Math.log10(m)) + ' dB'; }).join(', ') + '. ' + (-res.hr.worst.delta <= 10 ? 'Or keep the box count and swap to a model that is about +' + (-res.hr.worst.delta).toFixed(1) + ' dB louder per box (sensitivity + 10·log10 of RMS watts); a higher-sensitivity model is usually the cheaper route than piling on boxes. Shorter throws (delays or fills) or a lower target also close the gap.' : 'A model swap alone will not cover this much. If the gear cannot change, make do and maximize what is available: you have ' + res.hr.worst.headroom.toFixed(1) + ' dB of headroom at the ' + res.hr.worst.label.toLowerCase() + ' with the current rig. Shorten the throw with the delays or a fill, keep the target no higher than coverage needs, and set the real limits during calibration. This make-do guidance is general practice, not from the Scrolls.') + '</p>' : '') +
+      '<p class="hint">The ceiling is the continuous (RMS) level at full rated power, Mains only, free field. The target is the nominal SPL assumed at unity gain. Peaks, room gain and amp or DSP limits are not included.</p>' + chart(res, du, unit) + '</div>';
 
     var order = { bad: 0, warn: 1, info: 2 }, fl = res.flags.slice().sort(function (a, b) { return order[a.sev] - order[b.sev]; });
     var lab = { bad: 'Missing', warn: 'Check', info: 'Note' };
@@ -764,6 +792,7 @@ function model(i) {
     rows.forEach(function (r) { if (r.present) L.push(r.name + (inp.clusters[r.k].m ? ' [' + inp.clusters[r.k].m + ']' : '') + ' x' + inp.clusters[r.k].qty + ': ' + (r.isRef ? 'zero point, 0 ms' : (r.k === 'l' || r.k === 'r') ? f2(r.delayMs) + ' ms' : f2(r.delayMs) + ' ms at ' + dd(r.dist) + ' ' + unit + (r.dir === 'behind' ? ' behind' : '')) + ', ' + f1(r.spl1m) + ' dB at 1 m'); });
     L.push('Front row (' + dd(res.frowD) + ' ' + unit + '): ' + f1(res.atFront) + ' dB Mains only, ' + sg(res.atFront == null ? null : res.atFront - res.target) + ' dB vs target');
     L.push('Middle row (' + dd(res.midD) + ' ' + unit + '): ' + f1(res.atMid) + ' dB Mains only, ' + sg(res.midDrop == null ? null : res.midDrop) + ' dB vs front row');
+    L.push('Headroom vs ' + res.target + ' dB nominal target (goal ' + res.hr.goal + ' dB): ' + res.hr.rows.map(function (r) { return r.label.toLowerCase() + ' ' + sg(r.headroom) + ' dB'; }).join(', ') + (res.hr.mult ? '; about ' + res.hr.mult.toFixed(1) + 'x the Mains boxes needed for the goal' : ''));
     L.push('Mains combined: ' + f1(res.mains) + ' dB at 1 m; far point ' + f1(res.atFar) + ' dB; target ' + res.target + ' dB C Slow');
     fl.forEach(function (f) { L.push('[' + lab[f.sev] + '] ' + f.title + '. ' + f.text); });
     res.defaults.forEach(function (d) { L.push('[Default] ' + d); });
@@ -832,7 +861,8 @@ function model(i) {
       ['Power and SPL: ambient measured, pink noise set, faders at nominal' + (res.subDiff != null ? ', sub and top differential confirmed' : ''),
        'Time alignment: every pass recorded and waveform-nudged',
        'Transfer function: variance accepted on all clusters, anything over 10 dB fixed by repositioning',
-       'Coverage audit: zone targets confirmed, Delay L/R timed if needed, DSP committed after sign-off'].map(function (s, n) { return '<li><label for="so' + n + '"><input type="checkbox" id="so' + n + '"> ' + s + '</label></li>'; }).join('') + '</ul></div>';
+       'Coverage audit: zone targets confirmed, Delay L/R timed if needed, DSP committed after sign-off'].map(function (s, n) { return '<li><label for="so' + n + '"><input type="checkbox" id="so' + n + '"' + (soState[n] ? ' checked' : '') + '> ' + s + '</label></li>'; }).join('') + '</ul>' +
+      '<div class="copyrow"><label class="f" for="jobName" style="flex:1 1 14rem"><span>Job name</span><input id="jobName" type="text" autocomplete="off" value="' + esc(jobNameVal) + '" placeholder="' + esc(($('venueName') && $('venueName').value.trim()) || 'venue and date') + '"></label><button type="button" class="primary" id="btn-signoff"' + (soState.every(Boolean) ? '' : ' disabled') + '>Save signed-off job to the log</button></div><p class="hint" id="soHint">' + (soState.every(Boolean) ? 'All items ticked. Saving records this Step 0 design in the Job log; a calibration report is then required.' : 'Tick every item above to enable saving.') + '</p></div>';
     $('caltemp').innerHTML = h;
   };
 
@@ -876,6 +906,7 @@ function model(i) {
     blank.venue = 'indoor'; blank.app = 'full'; blank.dapp = 'ideal'; blank.lkEntry = 'Venue: \nSound system: \nApplication: Full range music\nDelay approach: Ideal'; blank.mirror = true; blank.mirror2 = true; blank['ff-dir'] = 'ahead'; blank['sub-dir'] = 'ahead'; CLK.forEach(function (k) { blank[k + '-qty'] = '1'; });
     MATS.forEach(function (m) { blank['mat-' + m[0]] = 'concrete'; });
     blank.dunit = $('dunit').value; blank.tunit = $('tunit').value;
+    soState = [false, false, false, false]; jobNameVal = '';
     setAll(blank); mirrorSync(); render(); save();
   });
   document.addEventListener('click', function (e) {
@@ -1003,6 +1034,153 @@ function model(i) {
     mirrorSync(); render(); save();
     lkmsg('Restored the values from before the import.');
   });
+  /* ---------- Job log: signed-off Step 0 jobs, then a required calibration report ---------- */
+  var JKEY = 'ninja-jobs-v1', jobs = [], soState = [false, false, false, false], jobNameVal = '', jlOpen = null, jlMsg = '';
+  var CLN = { l: 'FOH-L', r: 'FOH-R', ff: 'Center', sub: 'Subs', dl: 'Delay L', dr: 'Delay R' };
+  var loadJobs = function () { try { var a = JSON.parse(localStorage.getItem(JKEY) || '[]'); jobs = Array.isArray(a) ? a.filter(function (j) { return j && typeof j === 'object' && j.id; }) : []; } catch (e) { jobs = []; } };
+  var storeJobs = function () { try { localStorage.setItem(JKEY, JSON.stringify(jobs)); return true; } catch (e) { return false; } };
+  var numOrNull = function (v) { if (v === '' || v == null) return null; var n = parseFloat(v); return isFinite(n) ? n : null; };
+  var fmt = function (x, d) { return x == null || !isFinite(x) ? '—' : x.toFixed(d == null ? 1 : d); };
+  var sgn = function (x, d) { return x == null || !isFinite(x) ? '—' : (x > 0 ? '+' : '') + x.toFixed(d == null ? 1 : d); };
+  var curSnap = null; /* set by render(): { res, inp } */
+  var drops = function (est) { return { mid: est.atMid != null && est.atFront != null ? est.atMid - est.atFront : null, far: est.atFar != null && est.atFront != null ? est.atFar - est.atFront : null }; };
+  var makeJob = function () {
+    var res = curSnap.res, inp = curSnap.inp, rows = {};
+    ['l', 'r', 'ff', 'sub', 'dl', 'dr'].forEach(function (k) { var r = res.rows[k]; rows[k] = { name: r.name, present: !!r.present, delayMs: r.delayMs, dist: r.dist, spl1m: r.spl1m, isRef: !!r.isRef, qty: inp.clusters[k].qty, model: inp.clusters[k].m }; });
+    var d = new Date(), pad = function (n) { return (n < 10 ? '0' : '') + n; };
+    var date = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+    return { id: 'j' + d.getTime().toString(36) + Math.floor(Math.random() * 1e4).toString(36), name: (jobNameVal || '').trim().slice(0, 120) || ($('venueName') && $('venueName').value.trim().slice(0, 80)) || 'Untitled job', date: date, signedAt: d.toISOString(), ver: (typeof APP_VERSION !== 'undefined' ? APP_VERSION : ''),
+      inputs: getAll(), est: { rows: rows, mains: res.mains, atFront: res.atFront, atMid: res.atMid, atFar: res.atFar, frowD: res.frowD, midD: res.midD, far: res.far, target: res.target, c: res.c, app: res.app, headroom: res.hr.rows.map(function (r) { return { label: r.label, ceil: r.ceil, headroom: r.headroom }; }), hgoal: res.hr.goal, defaults: res.defaults.slice(0, 40), flags: res.flags.map(function (f) { return f.sev + ': ' + f.title; }).slice(0, 40) }, report: null };
+  };
+  var jobTable = function (j) {
+    var e = j.est, rp = j.report, h = '<div class="wrap"><table><thead><tr><th>Cluster</th><th class="n">Est. delay (ms)</th>' + (rp ? '<th class="n">Final in DSP (ms)</th><th class="n">Diff (ms)</th>' : '') + '</tr></thead><tbody>';
+    ['l', 'r', 'ff', 'sub', 'dl', 'dr'].forEach(function (k) {
+      var r = e.rows[k]; if (!r || !r.present) return;
+      var fin = rp && rp.delays ? rp.delays[k] : null;
+      h += '<tr><td>' + esc(r.name) + (r.isRef ? ' (zero point)' : '') + '</td><td class="n">' + fmt(r.delayMs, 2) + '</td>' + (rp ? '<td class="n">' + fmt(fin, 2) + '</td><td class="n">' + sgn(fin == null || r.delayMs == null ? null : fin - r.delayMs, 2) + '</td>' : '') + '</tr>';
+    });
+    h += '</tbody></table></div>';
+    var dr = drops(e);
+    h += '<div class="wrap"><table><thead><tr><th>Level</th><th class="n">Distance</th><th class="n">Step 0 ceiling (dB)</th><th class="n">Est. drop vs front (dB)</th>' + (rp ? '<th class="n">Measured (dB)</th><th class="n">Measured drop (dB)</th><th class="n">Drop error (dB)</th>' : '') + '</tr></thead><tbody>';
+    [['front', 'Front row', e.frowD, e.atFront, null], ['mid', 'Middle row', e.midD, e.atMid, dr.mid], ['far', 'Back / furthest', e.far, e.atFar, dr.far]].forEach(function (q) {
+      var m = rp && rp.spl ? rp.spl[q[0]] : null, mf = rp && rp.spl ? rp.spl.front : null, md = q[0] === 'front' ? null : (m != null && mf != null ? m - mf : null);
+      h += '<tr><td>' + q[1] + '</td><td class="n">' + fmt(q[2], 1) + ' m</td><td class="n">' + fmt(q[3], 1) + '</td><td class="n">' + (q[0] === 'front' ? '—' : sgn(q[4])) + '</td>' + (rp ? '<td class="n">' + fmt(m, 1) + '</td><td class="n">' + (q[0] === 'front' ? '—' : sgn(md)) + '</td><td class="n">' + (q[0] === 'front' ? '—' : sgn(md == null || q[4] == null ? null : md - q[4])) + '</td>' : '') + '</tr>';
+    });
+    return h + '</tbody></table></div>';
+  };
+  var reportForm = function (j) {
+    var e = j.est, id = j.id, h = '<h4>Calibration report (required)</h4><p class="hint">Fill this in after calibration. Step 0 levels are full-power ceilings, so the SPL comparison uses the <b>drop against the front row</b>, which does not depend on where you set the level. Measure C-weighted, Slow, at the same three positions.</p><div class="grid">';
+    ['l', 'r', 'ff', 'sub', 'dl', 'dr'].forEach(function (k) {
+      var r = e.rows[k]; if (!r || !r.present) return;
+      h += '<label class="f" for="rp-' + id + '-d-' + k + '"><span>' + esc(r.name) + ' final delay in DSP (ms) · est. ' + fmt(r.delayMs, 2) + '</span><input id="rp-' + id + '-d-' + k + '" type="number" step="0.01" inputmode="decimal"></label>';
+    });
+    h += '</div><div class="grid">' +
+      '<label class="f" for="rp-' + id + '-s-front"><span>Front row measured (dB SPL C slow)</span><input id="rp-' + id + '-s-front" type="number" step="0.1" inputmode="decimal"></label>' +
+      '<label class="f" for="rp-' + id + '-s-mid"><span>Middle row measured (dB)</span><input id="rp-' + id + '-s-mid" type="number" step="0.1" inputmode="decimal"></label>' +
+      '<label class="f" for="rp-' + id + '-s-far"><span>Back row measured (dB)</span><input id="rp-' + id + '-s-far" type="number" step="0.1" inputmode="decimal"></label>' +
+      '<label class="f" for="rp-' + id + '-amb"><span>Ambient noise (dB, optional)</span><input id="rp-' + id + '-amb" type="number" step="0.1" inputmode="decimal"></label>' +
+      '<label class="f" for="rp-' + id + '-dly"><span>Delays deployed?</span><select id="rp-' + id + '-dly"><option value="">Select</option><option value="yes">Yes</option><option value="no">No</option><option value="na">Not in this rig</option></select></label>' +
+      '<label class="f" for="rp-' + id + '-ctr"><span>Center used?</span><select id="rp-' + id + '-ctr"><option value="">Select</option><option value="yes">Yes</option><option value="no">No</option><option value="na">Not in this rig</option></select></label></div>' +
+      '<label class="f" for="rp-' + id + '-adj"><span>Practical adjustments made (aim, placement, trims, fills)</span><textarea id="rp-' + id + '-adj" class="ta" rows="3"></textarea></label>' +
+      '<label class="f" for="rp-' + id + '-dev"><span>Deviations from Step 0 and why</span><textarea id="rp-' + id + '-dev" class="ta" rows="3"></textarea></label>' +
+      '<div class="copyrow"><button type="button" class="jl-save primary" data-id="' + id + '">Save calibration report</button><span class="hint" id="rpmsg-' + id + '"></span></div>';
+    return h;
+  };
+  var benchmark = function () {
+    var done = jobs.filter(function (j) { return j.report; });
+    if (!done.length) return '';
+    var dl = {}, mid = [], far = [];
+    done.forEach(function (j) {
+      var e = j.est, rp = j.report, dr = drops(e);
+      ['l', 'r', 'ff', 'sub', 'dl', 'dr'].forEach(function (k) { var r = e.rows[k], f = rp.delays ? rp.delays[k] : null; if (r && r.present && r.delayMs != null && f != null) (dl[k.replace('r', 'l').replace('dr', 'dl')] = dl[k.replace('r', 'l').replace('dr', 'dl')] || []).push(Math.abs(f - r.delayMs)); });
+      var mf = rp.spl ? rp.spl.front : null;
+      if (mf != null && rp.spl.mid != null && dr.mid != null) mid.push(Math.abs((rp.spl.mid - mf) - dr.mid));
+      if (mf != null && rp.spl.far != null && dr.far != null) far.push(Math.abs((rp.spl.far - mf) - dr.far));
+    });
+    var avg = function (a) { return a.length ? a.reduce(function (s, x) { return s + x; }, 0) / a.length : null; };
+    var all = []; Object.keys(dl).forEach(function (k) { all = all.concat(dl[k]); });
+    return '<h3>Predicted versus measured (' + done.length + ' report' + (done.length === 1 ? '' : 's') + ')</h3><div class="wrap"><table><thead><tr><th>Measure</th><th class="n">Mean absolute error</th><th class="n">Readings</th></tr></thead><tbody>' +
+      '<tr><td>Delay (ms)</td><td class="n">' + fmt(avg(all), 2) + '</td><td class="n">' + all.length + '</td></tr>' +
+      '<tr><td>Middle row drop vs front (dB)</td><td class="n">' + fmt(avg(mid), 1) + '</td><td class="n">' + mid.length + '</td></tr>' +
+      '<tr><td>Back row drop vs front (dB)</td><td class="n">' + fmt(avg(far), 1) + '</td><td class="n">' + far.length + '</td></tr></tbody></table></div><p class="hint">Small sample sizes mean little. This table is for spotting a pattern across venues, such as the free-field estimate over-predicting the drop in reverberant rooms.</p>';
+  };
+  var renderJobs = function () {
+    var el = $('joblog'); if (!el) return;
+    var out = jobs.filter(function (j) { return !j.report; }).length;
+    var h = '<h2>Job log</h2><p class="hint">Signed-off Step 0 jobs are saved in this browser. Each one needs a calibration report with the actual results, adjustments and deviations. Download the log to keep a copy or share it, because browser storage can be cleared.</p>';
+    if (out) h += '<p class="note"><b>' + out + ' signed-off job' + (out === 1 ? ' has' : 's have') + ' no calibration report yet.</b> Open ' + (out === 1 ? 'it' : 'each') + ' below and file the actual results.</p>';
+    h += '<div class="copyrow"><button type="button" id="jl-json">Download log (JSON)</button><button type="button" id="jl-csv">Download comparison (CSV)</button><label class="btn" for="jl-import" style="cursor:pointer">Import log (JSON)</label><input id="jl-import" type="file" accept=".json,application/json" hidden></div>';
+    if (jlMsg) h += '<p class="hint">' + esc(jlMsg) + '</p>';
+    h += benchmark();
+    if (!jobs.length) h += '<p class="hint">No signed-off jobs yet. Tick every item in the CalTemp sign-off, then press Save signed-off job.</p>';
+    jobs.slice().reverse().forEach(function (j) {
+      h += '<details class="card jl-job" data-id="' + j.id + '"' + (jlOpen === j.id ? ' open' : '') + ' style="padding:10px"><summary><b>' + esc(j.name) + '</b> · ' + esc(j.date) + ' · ' + (j.report ? '<span class="sev info">Report filed</span>' : '<span class="sev warn">Report required</span>') + '</summary>' +
+        '<p class="hint">Application: ' + esc(j.est.app || 'full') + ' · target ' + fmt(j.est.target, 0) + ' dB · app v' + esc(j.ver || '') + ' · speed of sound ' + fmt(j.est.c, 1) + ' m/s</p>' + jobTable(j);
+      if (j.report) h += '<p><b>Adjustments:</b> ' + esc(j.report.adjustments) + '</p><p><b>Deviations:</b> ' + esc(j.report.deviations) + '</p><p class="hint">Delays deployed: ' + esc(j.report.deployed.delays) + ' · Center used: ' + esc(j.report.deployed.center) + (j.report.ambient != null ? ' · ambient ' + fmt(j.report.ambient, 1) + ' dB' : '') + ' · filed ' + esc(j.report.date) + '</p>';
+      else h += reportForm(j);
+      h += '<div class="copyrow"><button type="button" class="jl-load" data-id="' + j.id + '">Load these inputs into the calculator</button><button type="button" class="jl-del" data-id="' + j.id + '">Delete job</button></div></details>';
+    });
+    el.innerHTML = h;
+  };
+  var download = function (name, text, type) { var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: type })); a.download = name; document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500); };
+  var csvq = function (v) { v = v == null ? '' : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+  var jobsCsv = function () {
+    var rows = [['job', 'date', 'application', 'metric', 'predicted', 'actual', 'difference', 'status']];
+    jobs.forEach(function (j) {
+      var e = j.est, rp = j.report, st = rp ? 'reported' : 'report required', dr = drops(e);
+      ['l', 'r', 'ff', 'sub', 'dl', 'dr'].forEach(function (k) { var r = e.rows[k]; if (!r || !r.present) return; var f = rp && rp.delays ? rp.delays[k] : null; rows.push([j.name, j.date, e.app, 'delay ms ' + r.name, r.delayMs == null ? '' : r.delayMs.toFixed(3), f == null ? '' : f, f == null || r.delayMs == null ? '' : (f - r.delayMs).toFixed(3), st]); });
+      var mf = rp && rp.spl ? rp.spl.front : null;
+      [['mid', 'middle row drop vs front dB', dr.mid], ['far', 'back row drop vs front dB', dr.far]].forEach(function (q) { var m = rp && rp.spl ? rp.spl[q[0]] : null, a = m != null && mf != null ? m - mf : null; rows.push([j.name, j.date, e.app, q[1], q[2] == null ? '' : q[2].toFixed(2), a == null ? '' : a.toFixed(2), a == null || q[2] == null ? '' : (a - q[2]).toFixed(2), st]); });
+    });
+    return rows.map(function (r) { return r.map(csvq).join(','); }).join('\n');
+  };
+  var allSigned = function () { return soState.every(Boolean); };
+  var syncSignoff = function () { var b = $('btn-signoff'); if (b) b.disabled = !allSigned(); var h = $('soHint'); if (h) h.textContent = allSigned() ? 'All items ticked. Saving records this Step 0 design in the Job log; a calibration report is then required.' : 'Tick every item above to enable saving.'; };
+  document.addEventListener('change', function (e) { var m = e.target.id && e.target.id.match(/^so(\d)$/); if (m) { soState[+m[1]] = e.target.checked; syncSignoff(); } });
+  document.addEventListener('input', function (e) { if (e.target.id === 'jobName') jobNameVal = e.target.value; });
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('button'); if (!b) return;
+    if (b.id === 'btn-signoff') {
+      if (!allSigned() || !curSnap) return;
+      var j = makeJob(); jobs.push(j); var ok = storeJobs(); soState = [false, false, false, false]; jobNameVal = ''; jlOpen = j.id;
+      jlMsg = ok ? 'Saved "' + j.name + '". File its calibration report below.' : 'Saved for this session only: the browser blocked storage. Download the log now.';
+      renderJobs(); render(); setView('joblog'); window.scrollTo(0, 0); return;
+    }
+    if (b.id === 'jl-json') { download('audioninja-job-log.json', JSON.stringify({ app: 'AudioNinja Step 0', exported: new Date().toISOString(), jobs: jobs }, null, 1), 'application/json'); return; }
+    if (b.id === 'jl-csv') { download('audioninja-predicted-vs-measured.csv', jobsCsv(), 'text/csv'); return; }
+    var id = b.getAttribute('data-id'), j = id && jobs.filter(function (x) { return x.id === id; })[0];
+    if (!j) return;
+    if (b.classList.contains('jl-del')) { if (window.confirm('Delete "' + j.name + '" from the log?')) { jobs = jobs.filter(function (x) { return x.id !== id; }); storeJobs(); jlMsg = 'Deleted.'; renderJobs(); } return; }
+    if (b.classList.contains('jl-load')) { setAll(j.inputs); mirrorSync(); curD = $('dunit').value; curT = $('tunit').value; updateLinks(); render(); save(); jlMsg = 'Inputs loaded from "' + j.name + '".'; setView('inputs'); return; }
+    if (b.classList.contains('jl-save')) {
+      var g = function (s) { var el = $('rp-' + id + '-' + s); return el ? el.value : ''; }, miss = [], delays = {};
+      ['l', 'r', 'ff', 'sub', 'dl', 'dr'].forEach(function (k) { var r = j.est.rows[k]; if (!r || !r.present) return; var v = numOrNull(g('d-' + k)); if (v == null || v < 0) miss.push(r.name + ' final delay'); else delays[k] = v; });
+      var spl = { front: numOrNull(g('s-front')), mid: numOrNull(g('s-mid')), far: numOrNull(g('s-far')) };
+      ['front', 'mid', 'far'].forEach(function (s) { if (spl[s] == null || spl[s] <= 0) miss.push(s + ' row measurement'); });
+      if (!g('dly')) miss.push('delays deployed'); if (!g('ctr')) miss.push('center used');
+      if (!g('adj').trim()) miss.push('adjustments'); if (!g('dev').trim()) miss.push('deviations (write "none" if there were none)');
+      var msg = $('rpmsg-' + id);
+      if (miss.length) { if (msg) msg.textContent = 'Still needed: ' + miss.join(', ') + '.'; return; }
+      j.report = { date: new Date().toISOString().slice(0, 10), delays: delays, spl: spl, ambient: numOrNull(g('amb')), deployed: { delays: g('dly'), center: g('ctr') }, adjustments: g('adj').trim().slice(0, 2000), deviations: g('dev').trim().slice(0, 2000) };
+      var ok2 = storeJobs(); jlMsg = ok2 ? 'Report filed for "' + j.name + '".' : 'Report filed for this session only. Download the log.'; jlOpen = id; renderJobs();
+    }
+  });
+  document.addEventListener('change', function (e) {
+    if (e.target.id !== 'jl-import') return;
+    var f = e.target.files && e.target.files[0]; if (!f) return;
+    var rd = new FileReader();
+    rd.onload = function () {
+      try {
+        var o = JSON.parse(rd.result), a = Array.isArray(o) ? o : o && o.jobs, add = 0;
+        if (!Array.isArray(a)) throw new Error('shape');
+        a.forEach(function (j) { if (j && typeof j === 'object' && typeof j.id === 'string' && j.est && j.est.rows && j.inputs && !jobs.some(function (x) { return x.id === j.id; })) { jobs.push(j); add++; } });
+        storeJobs(); jlMsg = 'Imported ' + add + ' job' + (add === 1 ? '' : 's') + (add < a.length ? ' (' + (a.length - add) + ' skipped: duplicates or invalid)' : '') + '.';
+      } catch (err) { jlMsg = 'That file is not a job log from this app.'; }
+      renderJobs();
+    };
+    rd.readAsText(f); e.target.value = '';
+  });
+  loadJobs();
   /* lookups: model table first, then a copied request and an AI chat tab. No key, no API calls. */
   var tfetch = function (url, opt, ms) { var c = new AbortController(), t = setTimeout(function () { c.abort(); }, ms); opt.signal = c.signal; return fetch(url, opt).then(function (r) { clearTimeout(t); return r; }, function (e) { clearTimeout(t); throw e; }); };
   var CHATS = { claude: ['Claude', 'https://claude.ai/new?q='], chatgpt: ['ChatGPT', 'https://chatgpt.com/?q='], gemini: ['Gemini', 'https://gemini.google.com/app'] };
@@ -1053,7 +1231,7 @@ function model(i) {
 
 
   /* updates */
-  var APP_VERSION = '1.14.2', DEFAULT_UPDATE_URL = 'https://raw.githubusercontent.com/AudioninjaProductions/audioninja-step0/main/version.json', UK = 'ninja-upd-v1';
+  var APP_VERSION = '1.16.2', DEFAULT_UPDATE_URL = 'https://raw.githubusercontent.com/AudioninjaProductions/audioninja-step0/main/version.json', UK = 'ninja-upd-v1';
   var updUrl = DEFAULT_UPDATE_URL;
   try { var us = localStorage.getItem(UK); if (us) updUrl = us; } catch (e) {}
   $('verNow').textContent = APP_VERSION; $('updUrl').value = updUrl;
@@ -1634,6 +1812,6 @@ function model(i) {
   setAll(EXAMPLE);
   try { var s = localStorage.getItem(KEY); if (s) { var o = JSON.parse(s); setAll(o); if (o.hAng != null && o['l-h'] === undefined) $('l-h').value = o.hAng; if (o.vAng != null && o['l-v'] === undefined) $('l-v').value = o.vAng; } } catch (e) {}
   curD = $('dunit').value; curT = $('tunit').value;
-  mirrorSync(); updateLinks(); setView('results'); render();
+  mirrorSync(); updateLinks(); setView('results'); render(); renderJobs();
 })();
 </script></html>
