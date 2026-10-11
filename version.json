@@ -1,5 +1,5 @@
 {
-  "version": "1.4.2",
+  "version": "1.5.1",
   "url": "https://github.com/AudioninjaProductions/audioninja-step0/blob/main/AudioNinja_Step0_Calculator_Team.html",
-  "notes": "Fix: Fill fields now accepts AI replies with numbers as text (\"28 m\", \"92 ft\"), nested groups and different key names, and says what is wrong when nothing fills."
+  "notes": "Speakers typed in the new sound system box now fill their clusters offline from the built-in table (no AI needed), and an AI reply that lists the speakers under any heading or with no specs still fills the clusters."
 }

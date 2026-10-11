@@ -16,7 +16,7 @@ Step 0 is prep only. It never produces DSP values. Nothing here goes into the sy
 - **CalTemp**: a step-by-step live calibration workflow built from your result (SPL and headroom mapping, time and phase alignment, live transfer function tuning, playback and coverage verification).
 - **Lookup**: fills venue fields, and each speaker cluster (FOH-L/R tops, Center, Subs, Delay) has its own model box and look-up button that fills that cluster's RMS watts, sensitivity, peak SPL and coverage angles. Everything it fills is marked as unverified, and anything it cannot find stays blank for you to type.
 - **Save this model (v1.4.0)**: each cluster has a button that stores the make, model and the specs entered there on the device. Saved models are used first in lookups, are marked unverified, and can be exported with **Copy my models** / **Download my models** so a maintainer can check them against the data sheet and add them to `models.json`.
-- **Speaker model table (v1.3.0)**: 68 models from manufacturer data sheets (Mackie, JBL, QSC, Yamaha, RCF, Peavey, Electro-Voice, d&b, L-Acoustics, Meyer, Martin Audio, Nexo). Press a cluster's lookup button with a known model and it fills offline, with the data sheet link. Blank means not published; derived values are flagged.
+- **Speaker model table (v1.3.0)**: 74 models from manufacturer data sheets (Mackie, JBL, QSC, Yamaha, RCF, Peavey, Electro-Voice, d&b, L-Acoustics, Meyer, Martin Audio, Nexo). Press a cluster's lookup button with a known model and it fills offline, with the data sheet link. Blank means not published; derived values are flagged.
 - **Brands tab** (now the Database tab): an offline reference of 315 loudspeaker and amplifier brands (speakers, amplifiers, both, and OEM drivers and amplifier modules, vintage to current) with search and filters. The speaker model boxes suggest brand names as you type. **Update database** downloads a newer list from this repository when online.
 - **Sub setup**: subs are marked L/R stacked with FOH or mono center, and omni, cardioid or end-fire.
 - **Help tab**, **Copy summary**, and an automatic **update check**.
@@ -71,6 +71,9 @@ To update it: edit `brands.json` on GitHub, add brands in the same shape (`n` na
 
 ## Version history
 
+- **1.5.1** Sound system box fills clusters offline from the model table (button + applied after every AI import); importer finds the speaker list under any heading and with models only.
+- **1.5.0** Venue and sound system in one request and one import: sound system box, combined prompt, Fill fields populates the room and all clusters (quantity, sub setup and pattern). Table models use data sheet specs.
+- **1.4.3** Ambiguous model names list the matches instead of doing nothing; clear message when a model is not in the table; 6 more Mackie Thump models (74 total, models.json 2026.10.12).
 - **1.4.2** Fix: Import lookup data / Fill fields did not fill when the AI wrote numbers as text, in feet, or in nested groups. Now handled, with a clearer message when nothing matches.
 - **1.4.1** Copy request for AI chat button beside each lookup button (venue and every cluster).
 - **1.4.0** Save this model to the list, per cluster, with copy/download of saved models.
