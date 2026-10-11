@@ -1,5 +1,5 @@
 {
-  "version": "1.7.0",
+  "version": "1.8.0",
   "url": "https://github.com/AudioninjaProductions/audioninja-step0/blob/main/AudioNinja_Step0_Calculator_Team.html",
-  "notes": "AI settings removed. Ask AI now copies the request and opens your AI chat in one click; Paste AI reply and fill brings the reply back. No key is needed or stored."
+  "notes": "New Alignment reference option: the cluster farthest from the listening position is the zero-delay point (Auto), or pick Mains, Subs or Center. Delays, results and CalTemp follow it."
 }

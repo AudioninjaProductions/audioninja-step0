@@ -194,6 +194,7 @@ summary { cursor: pointer; font-weight: 600; font-size: 14px; }
       <li>Blank means the manufacturer does not publish it. Programme watts are shown halved and marked derived. If only a continuous SPL is published, peak is continuous + 3 dB and marked derived. The source link and any derived values appear in the lookup details.</li>
       <li>L-Acoustics, d&amp;b and Meyer publish peak SPL measured with a high crest factor signal. The app's peak minus 3 dB rule overstates continuous level for those, and the lookup says so.</li>
       <li><b>Save this model to the list</b> (in each cluster) keeps the make, model and the specs currently in that cluster on this device. Next time, the lookup button fills them offline. They are marked unverified. Use <b>Copy my models</b> in the Database tab to send them for checking and adding to the shared list.</li>
+      <li><b>Alignment reference:</b> pick which cluster is the zero point under Clusters, or leave it on Auto. The cluster farthest from the listening position (the RTA mic) gets zero delay and every other cluster, including the Mains, is delayed to match. Usually that is the Mains. When the Mains sit ahead of the subs, set the subs behind the Mains (Direction: Behind) and the subs become the zero point.</li>
       <li>Modeling rule: every cluster is a point source with one timing. Doubling the boxes in a cluster adds 3 dB by power sum.</li>
     </ul>
     <h3>Brands reference (works offline)</h3>
@@ -315,6 +316,10 @@ summary { cursor: pointer; font-weight: 600; font-size: 14px; }
         <legend>Clusters</legend>
         <p class="hint">Type a speaker model in each cluster and use its look-up button to fill that cluster's specs. Anything the lookup cannot find stays blank for you to type. Quantity starts at 1: raise it until the Mains reach your target. A Center, Sub or Delay cluster with only the quantity set is left out of the rig; set a quantity of 0 to remove FOH-L or FOH-R. Distance is how far ahead of (or behind) the Mains reference the cluster sits. Give either sensitivity with RMS watts, or the rated peak SPL at 1 m.</p>
         <p class="hint" id="qtyhelp" aria-live="polite"></p>
+        <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(14rem,1fr));margin:6px 0">
+          <label class="f" for="alignref"><span>Alignment reference (zero delay)</span><select id="alignref"><option value="">Auto: farthest from the listening position</option><option value="mains">FOH Mains</option><option value="sub">Subs</option><option value="ff">Center</option></select></label>
+        </div>
+        <p class="hint">Time alignment is done from one listening position (the RTA mic). The cluster farthest from it gets zero delay and the others are delayed to match. Usually that is the Mains. If the Mains sit ahead of the subs, the subs are the zero point and the Mains get the delay. "Distance ahead of Mains" is measured toward the audience along the throw.</p>
         <div id="clusters" style="display:flex;flex-direction:column;gap:10px"></div>
       </fieldset>
 
@@ -393,15 +398,34 @@ function model(i) {
       else if (cl.peak != null) { box = cl.peak - 3; row.how = 'peak'; usedPeak = true; }
       if (box == null) flag('bad', names[k] + ' level missing', 'Enter sensitivity with RMS watts, or the rated peak SPL at 1 m, so its level can be estimated.');
       else row.spl1m = box + 10 * Math.log10(cl.qty);
-      if (k === 'l' || k === 'r') row.delayMs = 0;
-      else if (cl.dist == null) flag('bad', names[k] + ' distance missing', 'A delay estimate needs the distance from the Mains reference.');
-      else if (out.c != null) {
-        row.behind = cl.dir === 'behind';
-        row.delayMs = (cl.dist / out.c) * 1000;
-      }
+      if (k === 'l' || k === 'r') row.pos = 0;
+      else if (cl.dist == null) flag('bad', names[k] + ' distance missing', 'A delay estimate needs the distance from the Mains.');
+      else row.pos = cl.dir === 'behind' ? -cl.dist : cl.dist;
     }
     out.rows[k] = row;
   });
+  /* alignment reference: the cluster farthest from the listening position is the zero point (position = metres toward the audience, Mains = 0) */
+  (function () {
+    var order = ['l', 'r', 'sub', 'ff', 'dl'], cand = order.filter(function (k) { return out.rows[k].present && out.rows[k].pos != null; });
+    if (!cand.length) return;
+    var auto = cand.reduce(function (b, k) { return out.rows[k].pos < out.rows[b].pos - 1e-9 ? k : b; }, cand[0]);
+    var sel = i.alignRef || '', want = sel === 'mains' ? 'l' : sel, refK = auto;
+    if (want) {
+      if (cand.indexOf(want) >= 0 || (want === 'l' && cand.indexOf('r') >= 0)) refK = cand.indexOf(want) >= 0 ? want : 'r';
+      else flag('info', 'Alignment reference not in the rig', 'The chosen zero point has no level or distance entered, so Auto was used instead.');
+    }
+    var refPos = out.rows[refK].pos, mainsRef = refK === 'l' || refK === 'r';
+    out.alignRef = refK; out.alignName = mainsRef ? 'the Mains' : names[refK];
+    cand.forEach(function (k) {
+      var r = out.rows[k], dpos = r.pos - refPos;
+      r.isRef = Math.abs(dpos) < 1e-9 && (k === refK || (mainsRef && (k === 'l' || k === 'r')));
+      if (Math.abs(dpos) < 1e-9) r.delayMs = 0;
+      else if (out.c != null) r.delayMs = (dpos / out.c) * 1000;
+      if (r.delayMs != null && r.delayMs < -1e-9) flag('warn', names[k] + ' is farther than the chosen zero point', 'It would need a negative delay. Pick ' + names[k] + ' as the reference, or use Auto.');
+    });
+    var mn = out.rows.l.present ? out.rows.l : out.rows.r;
+    if (!mainsRef && mn.delayMs != null && mn.delayMs > 1e-9) flag('info', 'Mains are delayed to ' + out.alignName, 'The farthest cluster from the listening position is ' + out.alignName + ', so it gets zero delay and the Mains need about ' + mn.delayMs.toFixed(2) + ' ms. Verify at Step 2.');
+  })();
   if (usedPeak) flag('info', 'Levels derived from peak SPL', 'Used rated peak SPL minus 3 dB as continuous RMS, which assumes peak power is twice RMS power. Enter sensitivity and RMS watts to use the spec directly.');
 
   var mains = [out.rows.l, out.rows.r].filter(function (r) { return r.present && r.spl1m != null; });
@@ -511,6 +535,7 @@ function model(i) {
     'dl-qty': 1, 'dl-w': 650, 'dl-sens': '', 'dl-peak': 127, 'dl-dist': 15.24
   };
   CLK.forEach(function (k) { EXAMPLE[k + '-model'] = ''; if (k !== 'sub') { EXAMPLE[k + '-h'] = ''; EXAMPLE[k + '-v'] = ''; } });
+  EXAMPLE.alignref = '';
   var ids = Object.keys(EXAMPLE);
   var setAll = function (o) {
     ids.forEach(function (id) {
@@ -548,7 +573,7 @@ function model(i) {
     return {
       venue: $('venue').value, roomL: d('roomL'), roomW: d('roomW'), roomH: d('roomH'), mats: mats,
       temp: T, target: val('target'), far: d('far'), awidth: d('awidth'), seats: val('seats'),
-      hAng: val('l-h'), vAng: val('l-v'), trim: d('trim'), spread: d('spread'),
+      hAng: val('l-h'), vAng: val('l-v'), trim: d('trim'), spread: d('spread'), alignRef: $('alignref') ? $('alignref').value : '',
       clusters: { l: cl('l', false), r: cl('r', false), ff: cl('ff', true), sub: cl('sub', true), dl: cl('dl', true) }
     };
   };
@@ -607,8 +632,8 @@ function model(i) {
     h += '<div class="card"><h2>Delay estimates</h2><div class="wrap"><table><thead><tr><th>Cluster</th><th class="n">Distance (' + unit + ')</th><th class="n">Delay (ms)</th><th>Note</th></tr></thead><tbody>' +
       rows.map(function (r) {
         if (!r.present) return '<tr><td>' + r.name + '</td><td class="n">—</td><td class="n">—</td><td>Not in rig</td></tr>';
-        var note = (r.k === 'l' || r.k === 'r') ? 'Reference' : r.behind ? 'Behind Mains: delay the Mains instead' : r.k === 'dl' ? 'Optional 10 to 20 ms precedence offset is your call' : 'Ahead of Mains';
-        return '<tr><td>' + r.name + '</td><td class="n">' + ((r.k === 'l' || r.k === 'r') ? '0' : dd(r.dist)) + '</td><td class="n">' + f2(r.delayMs) + '</td><td>' + note + '</td></tr>';
+        var mn_ = (r.k === 'l' || r.k === 'r'), note = r.isRef ? 'Zero point (farthest from the listening position)' : mn_ ? 'Delayed to match ' + (res.alignName || 'the Mains') : r.k === 'dl' ? 'Optional 10 to 20 ms precedence offset is your call' : 'Delayed to match ' + (res.alignName || 'the Mains');
+        return '<tr><td>' + r.name + '</td><td class="n">' + ((r.k === 'l' || r.k === 'r') ? '0' : dd(r.dist) + (r.dir === 'behind' ? ' behind' : '')) + '</td><td class="n">' + f2(r.delayMs) + '</td><td>' + note + '</td></tr>';
       }).join('') + '</tbody></table></div></div>';
 
     h += '<div class="card"><h2>Levels</h2><div class="wrap"><table><thead><tr><th>Cluster</th><th class="n">At 1 m (dB)</th><th class="n">Versus Mains (dB)</th></tr></thead><tbody>' +
@@ -640,7 +665,7 @@ function model(i) {
 
     var L = ['Step 0 summary (estimates only, no DSP values)'];
     L.push('Speed of sound: ' + (res.c == null ? 'missing' : res.c.toFixed(1) + ' m/s'));
-    rows.forEach(function (r) { if (r.present) L.push(r.name + (inp.clusters[r.k].m ? ' [' + inp.clusters[r.k].m + ']' : '') + ' x' + inp.clusters[r.k].qty + ': ' + (r.k === 'l' || r.k === 'r' ? 'reference' : f2(r.delayMs) + ' ms at ' + dd(r.dist) + ' ' + unit) + ', ' + f1(r.spl1m) + ' dB at 1 m'); });
+    rows.forEach(function (r) { if (r.present) L.push(r.name + (inp.clusters[r.k].m ? ' [' + inp.clusters[r.k].m + ']' : '') + ' x' + inp.clusters[r.k].qty + ': ' + (r.isRef ? 'zero point, 0 ms' : (r.k === 'l' || r.k === 'r') ? f2(r.delayMs) + ' ms' : f2(r.delayMs) + ' ms at ' + dd(r.dist) + ' ' + unit + (r.dir === 'behind' ? ' behind' : '')) + ', ' + f1(r.spl1m) + ' dB at 1 m'); });
     L.push('Mains combined: ' + f1(res.mains) + ' dB at 1 m; far point ' + f1(res.atFar) + ' dB; target ' + res.target + ' dB C Slow');
     fl.forEach(function (f) { L.push('[' + lab[f.sev] + '] ' + f.title + '. ' + f.text); });
     res.defaults.forEach(function (d) { L.push('[Default] ' + d); });
@@ -654,15 +679,16 @@ function model(i) {
   var sg2 = function (x) { return (x > 0 ? '+' : '') + x.toFixed(2); };
   var renderCal = function (res, inp, du, unit, dd) {
     var r = res.rows, t = res.target;
-    var pass = function (k, label, clip) { return r[k].present && r[k].delayMs != null ? '<li><b>' + label + '</b> (' + clip + '): Step 0 estimate ' + f2(r[k].delayMs) + ' ms' + (r[k].behind ? ', cluster is behind the Mains so expect the Mains to need the delay' : '') + (k === 'dl' ? ', plus your chosen precedence offset' : '') + '</li>' : ''; };
+    var pass = function (k, label, clip) { return r[k].present && r[k].delayMs != null ? '<li><b>' + label + '</b> (' + clip + '): Step 0 estimate ' + f2(r[k].delayMs) + ' ms' + (k === 'dl' ? ', plus your chosen precedence offset' : '') + '</li>' : ''; };
     var h = '<h2>CalTemp: live calibration for this rig</h2><p class="hint">Follows the Ninja Calibration sequence exactly. No EQ before Steps 1 and 2 are confirmed. Never boost a null. Numbers from Step 0 are targets to validate, not final DSP values.</p>';
     h += '<div class="step"><h3>Step 1: Target SPL and headroom mapping</h3><ol>' +
       '<li>SPL meter on C-weighting, Slow response, at the mix position.</li><li>Measure and record ambient noise.</li>' +
       '<li>Play pink noise at unity gain (0 dBu analog, −18 dBFS digital).</li><li>Raise amp gain until the reading is ambient + 40 dB.</li><li>Pull output faders down 20 dB for nominal working level.</li></ol>' +
       (res.subDiff != null ? '<p class="note">Sub runs ' + sg(res.subDiff) + ' dB against the Mains at 1 m. Confirm that is intentional and set the relative trim here.</p>' : '') + '</div>';
-    var passes = [['sub', r.sub.name + ' to Main', 'kick drum'], ['ff', 'Center to Main', 'snare'], ['dl', 'Delay to Main', 'snare']].filter(function (p) { return r[p[0]].present && r[p[0]].delayMs != null; });
+    var refN = res.alignName || 'the Mains';
+    var passes = [['l', 'Mains', 'snare'], ['sub', r.sub.name, 'kick drum'], ['ff', 'Center', 'snare'], ['dl', 'Delay', 'snare']].map(function (p) { return [p[0], p[1] + ' to ' + (refN === 'the Mains' ? 'Main' : refN), p[2]]; }).filter(function (p) { var rr = r[p[0]]; if (p[0] === 'l' && !rr.present) rr = r.r; return rr.present && rr.delayMs != null && !rr.isRef; });
     h += '<div class="step"><h3>Step 2: Time and phase alignment (waveform matching)</h3>' +
-      '<p class="hint">Source: Ninja Calibration Step 2 and the Time Alignment Technique in AudioNinjaScrolls. One reference position, one pass per cluster, each against the Mains.</p>' +
+      '<p class="hint">Source: Ninja Calibration Step 2 and the Time Alignment Technique in AudioNinjaScrolls. One reference position, one pass per cluster, each against ' + (res.alignName || 'the Mains') + (res.alignName && res.alignName !== 'the Mains' ? ' (the cluster farthest from the listening position: zero delay).' : '.') + '</p>' +
       '<h4>Build the Reaper template (once, then reuse)</h4><p class="hint">From the Sound System Calibration book and the 00 Calibration Template.RPP. Skip if you already have the template.</p><ol>' +
       '<li>New project: 44.1 kHz or higher, 24-bit, ASIO driver on Windows or the audio driver on Mac.</li>' +
       '<li>Make a Tones folder track. Put Playback (any music with a good spread of frequencies), Pink Noise, Sine Sweep and a 1K Tone track inside it. Mute the three generators and add the generator plug-ins.</li>' +
@@ -676,19 +702,19 @@ function model(i) {
       '<li>Disable the RTA output routing so the mic is never sent to the speakers.</li>' +
       '<li>Create a playback track with the transient clip, and assign the RTA mic channel to all record inputs.</li></ol>' +
       '<h4>Record each pass</h4><ol>' +
-      '<li>Solo the playback on the Mains only and record 10 seconds on the Mains track.</li>' +
+      '<li>Solo the playback on ' + (refN === 'the Mains' ? 'the Mains' : refN) + ' only and record 10 seconds on its track (the reference).</li>' +
       '<li>Solo the playback on the cluster only and record 10 seconds on that cluster\'s own track.</li>' +
       '<li>Use the right clip: kick for Sub to Main crossover alignment, snare for mid and high clusters.</li></ol>' +
       '<h4>Match the recordings</h4><ol>' +
       '<li>Zoom both recorded tracks to the first transient and stack them.</li>' +
-      '<li>Nudge the cluster track until its leading positive-compression edge lines up with the Mains track, for minimum phase inversion cycle by cycle.</li>' +
+      '<li>Nudge the cluster track until its leading positive-compression edge lines up with the reference track, for minimum phase inversion cycle by cycle.</li>' +
       '<li>Read the nudge as the time difference between the two tracks and note the offset in ms.</li>' +
       '<li>Compare it with the Step 0 estimate in the table below. A big gap means check the reference position, the temperature and the measured distances before trusting either number.</li>' +
       '<li>Do not write it to the DSP yet. The nudged value is a first-pass estimate: early reflections can fool it and it does not guarantee full-band phase coherence. Confirm it against a live dual-channel FFT transfer-function trace in Step 3, then enter the confirmed delay on the delay speaker\'s output.</li></ol>' +
       (passes.length ? '<div class="wrap"><table><thead><tr><th>Pass</th><th>Step 0 est. (ms)</th><th>Recorded (ms)</th><th>Diff (ms)</th></tr></thead><tbody>' +
         passes.map(function (p) {
           var k = p[0], mv = meas[k] == null ? '' : meas[k];
-          return '<tr><td>' + p[1] + (r[k].behind ? ' (cluster behind the Mains: the Mains need the delay)' : '') + (k === 'dl' ? ' (plus your precedence offset)' : '') + '<br><span class="hint">' + p[2] + ' clip</span></td><td>' + f2(r[k].delayMs) + '</td>' +
+          return '<tr><td>' + p[1] + (k === 'dl' ? ' (plus your precedence offset)' : '') + '<br><span class="hint">' + p[2] + ' clip</span></td><td>' + f2(r[k].delayMs) + '</td>' +
             '<td><input class="meas" data-k="' + k + '" data-est="' + r[k].delayMs + '" type="number" step="0.01" inputmode="decimal" aria-label="Recorded offset in milliseconds, ' + p[1] + '" value="' + mv + '" style="width:5.5rem;max-width:100%"></td><td class="mdiff" id="md-' + k + '">' + mdiff(mv, r[k].delayMs) + '</td></tr>';
         }).join('') + '</tbody></table></div><p class="hint">Enter the offset you read from the recordings as a plain positive number of milliseconds. The difference is recorded minus estimate. These entries are not saved when the page closes.</p>' : '<p class="note">No cluster with a distance and level is entered yet, so there are no passes to list. Add a Center, Sub or Delay cluster in Inputs.</p>') +
       (inp.venue === 'indoor' && res.flags.some(function (f) { return f.title.indexOf('reflective') >= 0; }) ? '<p class="note">Reflective room: early reflections can fool the waveform nudge. Do not skip Step 3 validation.</p>' : '') + '</div>';
@@ -924,7 +950,7 @@ function model(i) {
 
 
   /* updates */
-  var APP_VERSION = '1.7.0', DEFAULT_UPDATE_URL = 'https://raw.githubusercontent.com/AudioninjaProductions/audioninja-step0/main/version.json', UK = 'ninja-upd-v1';
+  var APP_VERSION = '1.8.0', DEFAULT_UPDATE_URL = 'https://raw.githubusercontent.com/AudioninjaProductions/audioninja-step0/main/version.json', UK = 'ninja-upd-v1';
   var updUrl = DEFAULT_UPDATE_URL;
   try { var us = localStorage.getItem(UK); if (us) updUrl = us; } catch (e) {}
   $('verNow').textContent = APP_VERSION; $('updUrl').value = updUrl;
@@ -1420,6 +1446,21 @@ function model(i) {
     var el = e.target; if (!el || el.type !== 'file' || !/-file$/.test(el.id)) return;
     var k = el.id.replace(/-file$/, '');
     readFileText(el.files && el.files[0], function (s) { $(k + '-paste').value = s.slice(0, 60000); lkmsg('File loaded. Press Read specs.'); });
+  });
+
+  /* Clear all also wipes the lookup helpers: sound system box, pasted text and files, import box, markers, undo */
+  $('btn-clear').addEventListener('click', function () {
+    if ($('sysHint')) $('sysHint').value = '';
+    $('importBox').value = '';
+    document.querySelectorAll('textarea[id$="-paste"]').forEach(function (t) { t.value = ''; });
+    document.querySelectorAll('input[type="file"]').forEach(function (f) { try { f.value = ''; } catch (e) {} });
+    document.querySelectorAll('details.cl-paste').forEach(function (d) { d.open = false; });
+    document.querySelectorAll('.lk').forEach(function (el) { el.classList.remove('lk'); });
+    var ta = $('askText'); if (ta) { ta.value = ''; ta.hidden = true; }
+    lkSnap = null; lookupInfo = null; lastTarget = null; notInTable = '';
+    $('btn-undo').hidden = true; $('imp').open = false;
+    lkmsg('Everything is cleared. Quantities start at 1.');
+    render(); save();
   });
   $('dbUpdate').addEventListener('click', function () {
     var mm = $('mMsg'); dbUrl = $('dbUrl').value.trim() || dbUrl;
