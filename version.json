@@ -1,5 +1,5 @@
 {
-  "version": "1.18.2",
+  "version": "1.19.0",
   "url": "https://github.com/AudioninjaProductions/audioninja-step0/blob/main/AudioNinja_Step0_Calculator_Team.html",
-  "notes": "New Metal surface option (steel deck, roof, rafters) counted as reflective; lookup replies mapping steel, corrugated or aluminum to Metal; fixed ceiling material not filling from lookup replies."
+  "notes": "Per-cluster speaker lookup: Ask AI about this speaker now always runs an AI web search request, Import AI result for this speaker fills only that cluster, Fill from built-in table is the offline option."
 }
