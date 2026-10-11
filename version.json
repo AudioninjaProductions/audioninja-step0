@@ -1,5 +1,5 @@
 {
-  "version": "1.20.2",
+  "version": "1.20.3",
   "url": "https://github.com/AudioninjaProductions/audioninja-step0/blob/main/AudioNinja_Step0_Calculator_Team.html",
-  "notes": "Removed the per-cluster Paste spec text / load a file box and the Paste the AI reply for this speaker box. Import AI result for this speaker reads the clipboard; if blocked it uses the Import lookup data box."
+  "notes": "CalTemp Step 3 wording: gentle EQ of 3 dB is fine inside the accepted band; over 10 dB reposition, re-aim or treat, EQ only as a last resort and never boost a null."
 }

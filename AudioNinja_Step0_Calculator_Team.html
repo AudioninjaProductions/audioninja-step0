@@ -864,7 +864,7 @@ function model(i) {
             '<td><input class="meas" data-k="' + k + '" data-est="' + r[k].delayMs + '" type="number" step="0.01" inputmode="decimal" aria-label="Recorded offset in milliseconds, ' + p[1] + '" value="' + mv + '" style="width:5.5rem;max-width:100%"></td><td class="mdiff" id="md-' + k + '">' + mdiff(mv, r[k].delayMs) + '</td></tr>';
         }).join('') + '</tbody></table></div><p class="hint">Enter the offset you read from the recordings as a plain positive number of milliseconds. The difference is recorded minus estimate. These entries are not saved when the page closes.</p>' : '<p class="note">No cluster with a distance and level is entered yet, so there are no passes to list. Add a Center, Sub or Delay cluster in Inputs.</p>') +
       (inp.venue === 'indoor' && res.flags.some(function (f) { return f.title.indexOf('reflective') >= 0; }) ? '<p class="note">Reflective room: early reflections can fool the waveform nudge. Do not skip Step 3 validation.</p>' : '') + '</div>';
-    h += '<div class="step"><h3>Step 3: Live transfer function tuning</h3><ol><li>Dual-channel FFT with a clean reference loop on channel 1 and the measurement mic on channel 2.</li><li>Confirm with pink noise, a sine sweep and live music.</li><li>Keep 40 dB SNR.</li><li>Band variance of ±3 to 6 dB: accept.</li><li>Band variance over 10 dB: stop and reposition or re-aim. Do not EQ it.</li></ol>' +
+    h += '<div class="step"><h3>Step 3: Live transfer function tuning</h3><ol><li>Dual-channel FFT with a clean reference loop on channel 1 and the measurement mic on channel 2.</li><li>Confirm with pink noise, a sine sweep and live music.</li><li>Keep 40 dB SNR.</li><li>Band variance of ±3 to 6 dB: accept. A gentle EQ of ±3 dB is fine if you want it.</li><li>Band variance over 10 dB: reposition, re-aim or add treatment where possible. Do not EQ it, and never boost a null. EQ is the last resort for correction, only when there is no other way.</li></ol>' +
       (res.cover && res.cover.dFull > 0 ? '<p class="note">Check the side areas inside ' + (res.cover.dFull / du).toFixed(1) + ' ' + unit + ' of the stage, where the Mains pattern does not yet reach the full width.</p>' : '') + '</div>';
     h += '<div class="step"><h3>Step 4: Playback and coverage verification</h3><ul>' +
       '<li><b>Front row:</b> at or under ' + t + ' dB SPL C' + (r.ff.present ? '. Trim the Center at the seat by ear and meter.' : '.') + '</li>' +
@@ -875,7 +875,7 @@ function model(i) {
     h += '<div class="step"><h3>Pre-show sign-off</h3><ul class="signoff">' +
       ['Power and SPL: ambient measured, pink noise set, faders at nominal' + (res.subDiff != null ? ', sub and top differential confirmed' : ''),
        'Time alignment: every pass recorded and waveform-nudged',
-       'Transfer function: variance accepted on all clusters, anything over 10 dB fixed by repositioning',
+       'Transfer function: variance accepted on all clusters, anything over 10 dB fixed by repositioning, re-aiming or treatment (EQ only as a last resort, no null boosted)',
        'Coverage audit: zone targets confirmed, Delay L/R timed if needed, DSP committed after sign-off'].map(function (s, n) { return '<li><label for="so' + n + '"><input type="checkbox" id="so' + n + '"' + (soState[n] ? ' checked' : '') + '> ' + s + '</label></li>'; }).join('') + '</ul>' +
       '<div class="copyrow"><label class="f" for="jobName" style="flex:1 1 14rem"><span>Job name</span><input id="jobName" type="text" autocomplete="off" value="' + esc(jobNameVal) + '" placeholder="' + esc(($('venueName') && $('venueName').value.trim()) || 'venue and date') + '"></label><button type="button" class="primary" id="btn-signoff"' + (soState.every(Boolean) ? '' : ' disabled') + '>Save signed-off job to the log</button></div><p class="hint" id="soHint">' + (soState.every(Boolean) ? 'All items ticked. Saving records this Step 0 design in the Job log; a calibration report is then required.' : 'Tick every item above to enable saving.') + '</p></div>';
     $('caltemp').innerHTML = h;
@@ -1273,7 +1273,7 @@ function model(i) {
 
 
   /* updates */
-  var APP_VERSION = '1.20.2', DEFAULT_UPDATE_URL = 'https://raw.githubusercontent.com/AudioninjaProductions/audioninja-step0/main/version.json', UK = 'ninja-upd-v1';
+  var APP_VERSION = '1.20.3', DEFAULT_UPDATE_URL = 'https://raw.githubusercontent.com/AudioninjaProductions/audioninja-step0/main/version.json', UK = 'ninja-upd-v1';
   var updUrl = DEFAULT_UPDATE_URL;
   try { var us = localStorage.getItem(UK); if (us) updUrl = us; } catch (e) {}
   $('verNow').textContent = APP_VERSION; $('updUrl').value = updUrl;
