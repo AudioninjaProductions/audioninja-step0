@@ -1,5 +1,5 @@
 {
-  "version": "1.9.1",
+  "version": "1.12.0",
   "url": "https://github.com/AudioninjaProductions/audioninja-step0/blob/main/AudioNinja_Step0_Calculator_Team.html",
-  "notes": "Delay distance now defaults to where the Mains-only level falls 6 dB below the target SPL when left blank. Delay is split into Delay L and Delay R."
+  "notes": "New Delay approach: Ideal design (delays where the Mains drop 6 dB) or Budget (10 dB, for venues that cannot afford delay clusters, such as small churches)."
 }

@@ -284,6 +284,20 @@ summary { cursor: pointer; font-weight: 600; font-size: 14px; }
       </fieldset>
 
       <fieldset>
+        <legend>Application</legend>
+        <div class="grid">
+          <label class="f" for="app"><span>What is the system for?</span>
+            <select id="app"><option value="full">Full range music (DJ, live band with drums and bass)</option><option value="acoustic">Acoustic (no drums or bass)</option><option value="speech">Speech only</option></select></label>
+        </div>
+        <div class="grid">
+          <label class="f" for="dapp"><span>Delay approach</span>
+            <select id="dapp"><option value="ideal">Ideal design: delays where the Mains drop 6 dB</option><option value="budget">Budget: delays only where the Mains drop 10 dB</option></select></label>
+        </div>
+        <p class="hint">Ideal design puts the next cluster at one doubling of distance. Budget accepts up to 10 dB of drop for venues that cannot afford delay clusters, such as small churches. It only sets the default when the Delay L distance is blank.</p>
+        <p class="hint" id="apphint"></p>
+      </fieldset>
+
+      <fieldset>
         <legend>Venue</legend>
         <div class="grid">
           <label class="f" for="venue"><span>Venue type</span>
@@ -325,10 +339,11 @@ summary { cursor: pointer; font-weight: 600; font-size: 14px; }
 
       <fieldset>
         <legend>Coverage and aim</legend>
-        <p class="hint">Leave blank to use industry-standard assumptions. The coverage angles come from the FOH-L tops cluster above. Trim and spread are placement decisions: a lookup only fills them if a rider states them.</p>
+        <p class="hint">Leave blank to use industry-standard assumptions. The coverage angles come from the FOH-L tops cluster above. Trim, spread and front row distance are placement decisions: a lookup only fills them if a rider states them.</p>
         <div class="grid">
           <label class="f" for="trim"><span>Trim height</span><input id="trim" type="number" inputmode="decimal" step="any" placeholder="blank = 2.75 m"></label>
           <label class="f" for="spread"><span>FOH L-R spread</span><input id="spread" type="number" inputmode="decimal" step="any" placeholder="blank = 6 m"></label>
+          <label class="f" for="frow"><span>Front row distance from Mains</span><input id="frow" type="number" inputmode="decimal" step="any" placeholder="blank = 2 m"></label>
         </div>
       </fieldset>
       <button type="button" class="primary" id="btn-see">See results</button>
@@ -373,6 +388,7 @@ function model(i) {
   ci.roomH = chk(i.roomH, 0, 500, 'Ceiling height', 'm');
   ci.trim = chk(i.trim, 0, 500, 'Trim height', 'm');
   ci.spread = chk(i.spread, 0, 2000, 'FOH spread', 'm');
+  ci.frow = chk(i.frow, 0, 2000, 'Front row distance', 'm');
   ci.hAng = chk(i.hAng, 1, 179, 'Horizontal coverage', 'degrees');
   ci.vAng = chk(i.vAng, 1, 179, 'Vertical coverage', 'degrees');
   i = ci;
@@ -390,7 +406,7 @@ function model(i) {
   var sp = [CFGN[i.clusters.sub.cfg], PATN[i.clusters.sub.pat]].filter(Boolean);
   var names = { l: 'FOH-L', r: 'FOH-R', ff: 'Center', sub: sp.length ? 'Sub (' + sp.join(', ') + ')' : 'Sub', dl: 'Delay L', dr: 'Delay R' };
   ['l', 'r', 'ff', 'sub', 'dl', 'dr'].forEach(function (k) {
-    if (k === 'sub' && present(i.clusters.sub, 'sub') && i.clusters.sub.cfg === 'lr' && i.clusters.sub.dist == null) { i.clusters.sub.dist = 0; dflt('Sub distance: 0 (L/R stacked with FOH, so the subs sit at the Mains reference).'); }
+    if (k === 'sub' && (i.app === 'full' || !i.app) && present(i.clusters.sub, 'sub') && i.clusters.sub.cfg === 'lr' && i.clusters.sub.dist == null) { i.clusters.sub.dist = 0; dflt('Sub distance: 0 (L/R stacked with FOH, so the subs sit at the Mains reference).'); }
     var cl = i.clusters[k], row = { k: k, name: names[k], present: present(cl, k), spl1m: null, delayMs: null, dist: cl.dist, dir: cl.dir, behind: false, how: null };
     if (row.present) {
       var box = null;
@@ -399,25 +415,57 @@ function model(i) {
       if (box == null) flag('bad', names[k] + ' level missing', 'Enter sensitivity with RMS watts, or the rated peak SPL at 1 m, so its level can be estimated.');
       else row.spl1m = box + 10 * Math.log10(cl.qty);
       if (k === 'l' || k === 'r') row.pos = 0;
-      else if (cl.dist == null && (k === 'dl' || k === 'dr')) row.autoDist = true;
+      else if (cl.dist == null && (k === 'dl' || k === 'dr' || k === 'ff')) row.autoDist = true;
       else if (cl.dist == null) flag('bad', names[k] + ' distance missing', 'A delay estimate needs the distance from the Mains.');
       else row.pos = cl.dir === 'behind' ? -cl.dist : cl.dist;
     }
     out.rows[k] = row;
   });
+  /* application criteria: acoustic and speech work has no sub content, so the subs are left out of the estimate (typed values are kept) */
+  out.app = i.app === 'acoustic' || i.app === 'speech' ? i.app : 'full';
+  if (out.app !== 'full' && out.rows.sub.present) {
+    var sr = out.rows.sub; sr.present = false; sr.autoOff = true; sr.pos = null;
+    sr.autoNote = 'Off: not used for ' + (out.app === 'speech' ? 'speech only' : 'acoustic (no drums or bass)');
+    flag('info', 'Subs left out for this application', (out.app === 'speech' ? 'Speech only' : 'Acoustic with no drums or bass') + ' has no sub content, so the sub cluster is not in the delay, level or CalTemp estimate. Choose Full range music to bring it back.');
+  }
+  /* center cluster: needed only if the front row sits inside the distance where the L and R patterns meet.
+     Nominal coverage is the -6 dB edge, so at the meeting point each side is -6 dB and the power sum is about -3 dB; closer in it is worse. */
+  (function () {
+    var f = out.rows.ff;
+    if (!f.present || !f.autoDist) return;
+    var hh = i.hAng == null ? 90 : i.hAng, ss = i.spread == null ? 6 : i.spread, fr = i.frow == null ? 2 : i.frow;
+    var dMeet = (ss / 2) / Math.tan(hh * Math.PI / 360);
+    out.ffMeet = dMeet; out.frow = fr;
+    if (dMeet <= fr) {
+      f.present = false; f.autoOff = true; f.pos = null; f.autoNote = 'Off: not needed, the Mains patterns already meet by the front row (about ' + dMeet.toFixed(1) + ' m)';
+      flag('info', 'Center cluster switched off automatically', 'With the Center distance left blank: at a ' + ss.toFixed(1) + ' m spread and ' + hh + ' degree pattern the L and R edges meet about ' + dMeet.toFixed(1) + ' m out, inside the front row (' + fr.toFixed(1) + ' m), so the center of the front row is within about 3 dB of on-axis from the Mains alone. Enter a Center distance to bring it back in. Assumes the -6 dB edge convention for the coverage angle; geometry estimate, an extension beyond the Scrolls.');
+    } else {
+      f.dist = 0; f.pos = 0;
+      dflt('Center distance: 0 m (at the Mains line). The L and R patterns only meet about ' + dMeet.toFixed(1) + ' m out, past the front row (' + fr.toFixed(1) + ' m), so the front-row center is more than 3 dB down on the Mains alone.');
+    }
+  })();
   /* default delay distance: where the Mains-only level has fallen 6 dB below the front-row target (inverse square) */
   (function () {
+    var drop = i.dapp === 'budget' ? 10 : 6, dname = drop === 10 ? 'budget approach, 10 dB' : 'ideal design, 6 dB';
     var dls = ['dl', 'dr'].filter(function (k) { return out.rows[k].present && out.rows[k].autoDist; });
     if (!dls.length) return;
     var ms = [out.rows.l, out.rows.r].filter(function (r) { return r.present && r.spl1m != null; });
-    if (!ms.length) { dls.forEach(function (k) { flag('bad', names[k] + ' distance missing', 'Enter a distance, or add a FOH level so the default (where the Mains drop 6 dB below target) can be worked out.'); }); return; }
+    if (!ms.length) { dls.forEach(function (k) { flag('bad', names[k] + ' distance missing', 'Enter a distance, or add a FOH level so the default (where the Mains drop ' + drop + ' dB below target) can be worked out.'); }); return; }
     var m1 = 10 * Math.log10(ms.reduce(function (a, r) { return a + Math.pow(10, r.spl1m / 10); }, 0));
-    var d = Math.pow(10, (m1 - (target - 6)) / 20);
-    if (d < 1) { d = 1; flag('info', 'Default delay distance clamped to 1 m', 'The Mains are already 6 dB under target at 1 m. Enter the real delay position.'); }
+    var d = Math.pow(10, (m1 - (target - drop)) / 20);
+    if (d < 1) { d = 1; flag('info', 'Default delay distance clamped to 1 m', 'The Mains are already ' + drop + ' dB under target at 1 m. Enter the real delay position.'); }
+    if (i.far != null && d > i.far) {
+      /* the Mains alone cover the whole audience within ' + drop + ' dB of target: delays are switched off for this estimate (the typed quantity is left alone) */
+      dls.forEach(function (k) { var r = out.rows[k]; r.present = false; r.autoOff = true; r.pos = null; r.autoNote = 'Off: not needed, the Mains cover the audience within ' + drop + ' dB of target'; });
+      flag('info', 'Delays switched off automatically', 'With the distance left blank, the delays would sit at ' + d.toFixed(1) + ' m, beyond the furthest audience point (' + i.far.toFixed(1) + ' m). The Mains alone stay within ' + drop + ' dB of target to the back, so no delay is needed. Enter a Delay L distance to bring them back in.');
+      return;
+    }
     dls.forEach(function (k) { var r = out.rows[k]; r.dist = d; r.pos = r.dir === 'behind' ? -d : d; });
-    dflt('Delay distance: ' + d.toFixed(1) + ' m, where the Mains-only level falls 6 dB below the ' + target + ' dB target (inverse square, free field). Enter the real position when known.');
-    if (i.far != null && d > i.far) flag('info', 'Delay default is beyond the furthest audience point', 'The Mains alone stay within 6 dB of target out to the back, so a delay may not be needed. Enter a distance if you still plan one.');
+    dflt('Delay distance: ' + d.toFixed(1) + ' m, where the Mains-only level falls ' + drop + ' dB below the ' + target + ' dB target (' + dname + '; inverse square, free field). Enter the real position when known.');
   })();
+  /* sanity checks from peer review: placements that cannot be right */
+  if (i.frow != null && i.far != null && i.frow > i.far) flag('warn', 'Front row is beyond the furthest audience point', 'The front row distance (' + i.frow.toFixed(1) + ' m) is larger than the furthest audience point (' + i.far.toFixed(1) + ' m), so the Center decision cannot be trusted. Check both.');
+  ['dl', 'dr'].forEach(function (k) { var r = out.rows[k]; if (k === 'dl' && r.present && !r.autoDist && r.dist != null && i.far != null && r.dist > i.far) flag('warn', 'Delay is beyond the furthest audience point', 'Delay L/R at ' + r.dist.toFixed(1) + ' m is past the back of the audience (' + i.far.toFixed(1) + ' m), so it covers no one. Check the distance.'); });
   /* alignment reference: the cluster farthest from the listening position is the zero point (position = metres toward the audience, Mains = 0) */
   (function () {
     var order = ['l', 'r', 'sub', 'ff', 'dl', 'dr'], grp = function (k) { return k === 'l' || k === 'r' ? 'm' : k === 'dl' || k === 'dr' ? 'd' : k; }, cand = order.filter(function (k) { return out.rows[k].present && out.rows[k].pos != null; });
@@ -456,7 +504,7 @@ function model(i) {
   out.dAny = dAny;
   out.delayDist = dAny ? dAny.dist : null;
   out.atDelay = atD(out.mains, out.delayDist);
-  if (out.mains != null && out.rows.sub.spl1m != null) out.subDiff = out.rows.sub.spl1m - out.mains;
+  if (out.mains != null && out.rows.sub.present && out.rows.sub.spl1m != null) out.subDiff = out.rows.sub.spl1m - out.mains;
   if (out.rows.ff.present && out.rows.ff.dist != null && out.rows.ff.dist < 1)
     flag('info', 'Center trim is a live job', 'The inverse-square formula is not valid inside 1 m. Set the Center level at the seat by ear and meter.');
   if (out.subDiff != null && Math.abs(out.subDiff) >= 2)
@@ -513,7 +561,7 @@ function model(i) {
   var CLNAME = { l: 'FOH tops', r: 'FOH tops', ff: 'Center', sub: 'Subs', dl: 'Delay L', dr: 'Delay R' };
   var MATS = [['floor', 'Floor'], ['ceil', 'Ceiling'], ['stage', 'Stage wall'], ['back', 'Back wall'], ['left', 'Left wall'], ['right', 'Right wall']];
   var MOPT = [['concrete', 'Concrete'], ['glass', 'Glass'], ['tile', 'Tile'], ['brick', 'Brick'], ['drywall', 'Drywall'], ['wood', 'Wood'], ['curtain', 'Curtain'], ['panel', 'Acoustic panel'], ['open', 'Open or audience']];
-  var DISTIDS = ['roomL', 'roomW', 'roomH', 'far', 'awidth', 'trim', 'spread', 'ff-dist', 'sub-dist', 'dl-dist'];
+  var DISTIDS = ['roomL', 'roomW', 'roomH', 'far', 'awidth', 'trim', 'spread', 'frow', 'ff-dist', 'sub-dist', 'dl-dist'];
   var CLK = ['l', 'r', 'ff', 'sub', 'dl', 'dr'];
   var $ = function (id) { return document.getElementById(id); };
   var KEY = 'ninja-step0-v1';
@@ -532,7 +580,7 @@ function model(i) {
     var mdl = '<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(12rem,1fr));margin-top:6px"><label class="f" for="' + k + '-model"><span>Speaker model</span><input id="' + k + '-model" type="text" autocomplete="off" placeholder="for the look-up"></label></div>' +
       '<div class="copyrow" style="margin:6px 0"><button type="button" class="cl-ask" data-k="' + k + '">Ask AI about this speaker</button><a id="' + k + '-web" class="btn" target="_blank" rel="noopener" hidden>Search the speaker</a></div>';
     var dist = (k === 'l' || k === 'r' || k === 'dr') ? '' :
-      num(k + '-dist', k === 'dl' ? 'Distance ahead of Mains (blank = where Mains drop 6 dB)' : 'Distance ahead of Mains', k === 'dl' ? 'placeholder="auto"' : '') +
+      num(k + '-dist', k === 'dl' ? 'Distance ahead of Mains (blank = auto from the delay approach)' : k === 'ff' ? 'Distance ahead of Mains (blank = auto)' : 'Distance ahead of Mains', (k === 'dl' || k === 'ff') ? 'placeholder="auto"' : '') +
       (c.dir ? '<label class="f" for="' + k + '-dir"><span>Direction</span><select id="' + k + '-dir"><option value="ahead">Ahead</option><option value="behind">Behind</option></select></label>' : '');
     var cov = c.cov ? num(k + '-h', 'Horizontal coverage (deg)') + num(k + '-v', 'Vertical coverage (deg)') : '';
     var subx = c.sub ? sel('sub-cfg', 'Sub configuration', [['', 'Not set'], ['lr', 'L/R stacked'], ['mono', 'Mono center']]) + sel('sub-pat', 'Sub pattern', [['', 'Not set'], ['omni', 'Omni'], ['cardioid', 'Cardioid'], ['endfire', 'End-fire']]) : '';
@@ -541,9 +589,9 @@ function model(i) {
   }).join('');
 
   var EXAMPLE = {
-    venue: 'indoor', venueName: '', dunit: 'm', tunit: 'C', roomL: 20, roomW: 30, roomH: 4,
+    app: 'full', dapp: 'ideal', venue: 'indoor', venueName: '', dunit: 'm', tunit: 'C', roomL: 20, roomW: 30, roomH: 4,
     'mat-floor': 'concrete', 'mat-ceil': 'concrete', 'mat-stage': 'concrete', 'mat-back': 'concrete', 'mat-left': 'concrete', 'mat-right': 'concrete',
-    temp: 30, target: '', far: 15.24, awidth: '', seats: '', trim: '', spread: '',
+    temp: 30, target: '', far: 15.24, awidth: '', seats: '', trim: '', spread: '', frow: '',
     'l-qty': 1, 'l-w': 650, 'l-sens': '', 'l-peak': 127,
     'r-qty': 1, 'r-w': 650, 'r-sens': '', 'r-peak': 127, mirror: true,
     'ff-qty': 1, 'ff-w': 650, 'ff-sens': '', 'ff-peak': 127, 'ff-dist': 0.61, 'ff-dir': 'ahead',
@@ -592,9 +640,9 @@ function model(i) {
     };
     var mats = {}; MATS.forEach(function (m) { mats[m[0]] = $('mat-' + m[0]).value; });
     return {
-      venue: $('venue').value, roomL: d('roomL'), roomW: d('roomW'), roomH: d('roomH'), mats: mats,
+      app: $('app').value || 'full', dapp: $('dapp').value || 'ideal', venue: $('venue').value, roomL: d('roomL'), roomW: d('roomW'), roomH: d('roomH'), mats: mats,
       temp: T, target: val('target'), far: d('far'), awidth: d('awidth'), seats: val('seats'),
-      hAng: val('l-h'), vAng: val('l-v'), trim: d('trim'), spread: d('spread'), alignRef: $('alignref') ? $('alignref').value : '',
+      hAng: val('l-h'), vAng: val('l-v'), trim: d('trim'), spread: d('spread'), frow: d('frow'), alignRef: $('alignref') ? $('alignref').value : '',
       clusters: { l: cl('l', false), r: cl('r', false), ff: cl('ff', true), sub: cl('sub', true), dl: cl('dl', true), dr: cl('dr', false) }
     };
   };
@@ -643,6 +691,7 @@ function model(i) {
   var summaryText = '';
   var render = function () {
     var inp = read(), res = model(inp);
+    $('apphint').textContent = res.app === 'full' ? 'All clusters are considered. Delay and Center are predicted from coverage and level.' : 'No sub content: the subs are left out of the estimate. Delay and Center are still predicted from coverage and level.';
     var du = $('dunit').value === 'ft' ? 0.3048 : 1, unit = $('dunit').value;
     $('room').hidden = $('mats').hidden = inp.venue === 'outdoor';
     var dd = function (m) { return m == null ? '—' : (m / du).toFixed(2); };
@@ -658,7 +707,7 @@ function model(i) {
     var rows = ['l', 'r', 'ff', 'sub', 'dl', 'dr'].map(function (k) { return res.rows[k]; });
     h += '<div class="card"><h2>Delay estimates</h2><div class="wrap"><table><thead><tr><th>Cluster</th><th class="n">Distance (' + unit + ')</th><th class="n">Delay (ms)</th><th>Note</th></tr></thead><tbody>' +
       rows.map(function (r) {
-        if (!r.present) return '<tr><td>' + r.name + '</td><td class="n">—</td><td class="n">—</td><td>Not in rig</td></tr>';
+        if (!r.present) return '<tr><td>' + r.name + '</td><td class="n">—</td><td class="n">—</td><td>' + (r.autoOff ? r.autoNote : 'Not in rig') + '</td></tr>';
         var mn_ = (r.k === 'l' || r.k === 'r'), note = r.isRef ? 'Zero point (farthest from the listening position)' : mn_ ? 'Delayed to match ' + (res.alignName || 'the Mains') : (r.k === 'dl' || r.k === 'dr') ? 'Optional 10 to 20 ms precedence offset is your call' : 'Delayed to match ' + (res.alignName || 'the Mains');
         return '<tr><td>' + r.name + '</td><td class="n">' + ((r.k === 'l' || r.k === 'r') ? '0' : dd(r.dist) + (r.dir === 'behind' ? ' behind' : '')) + '</td><td class="n">' + f2(r.delayMs) + '</td><td>' + note + '</td></tr>';
       }).join('') + '</tbody></table></div></div>';
@@ -691,6 +740,7 @@ function model(i) {
     $('qtyhelp').textContent = res.atFar != null ? 'Mains at the furthest point: ' + f1(res.atFar) + ' dB, ' + (res.atFar >= res.target ? sg(res.atFar - res.target) + ' dB over' : f1(res.target - res.atFar) + ' dB under') + ' the ' + res.target + ' dB target. Doubling the Mains quantity adds about 3 dB in this estimate.' : '';
 
     var L = ['Step 0 summary (estimates only, no DSP values)'];
+    L.push('Application: ' + ({ full: 'Full range music', acoustic: 'Acoustic, no drums or bass', speech: 'Speech only' }[inp.app] || 'Full range music'));
     L.push('Speed of sound: ' + (res.c == null ? 'missing' : res.c.toFixed(1) + ' m/s'));
     rows.forEach(function (r) { if (r.present) L.push(r.name + (inp.clusters[r.k].m ? ' [' + inp.clusters[r.k].m + ']' : '') + ' x' + inp.clusters[r.k].qty + ': ' + (r.isRef ? 'zero point, 0 ms' : (r.k === 'l' || r.k === 'r') ? f2(r.delayMs) + ' ms' : f2(r.delayMs) + ' ms at ' + dd(r.dist) + ' ' + unit + (r.dir === 'behind' ? ' behind' : '')) + ', ' + f1(r.spl1m) + ' dB at 1 m'); });
     L.push('Mains combined: ' + f1(res.mains) + ' dB at 1 m; far point ' + f1(res.atFar) + ' dB; target ' + res.target + ' dB C Slow');
@@ -798,7 +848,7 @@ function model(i) {
   $('btn-example').addEventListener('click', function () { setAll(EXAMPLE); curD = 'm'; curT = 'C'; mirrorSync(); render(); save(); });
   $('btn-clear').addEventListener('click', function () {
     var blank = {}; ids.forEach(function (id) { blank[id] = ''; });
-    blank.venue = 'indoor'; blank.mirror = true; blank.mirror2 = true; blank['ff-dir'] = 'ahead'; blank['sub-dir'] = 'ahead'; CLK.forEach(function (k) { blank[k + '-qty'] = '1'; });
+    blank.venue = 'indoor'; blank.app = 'full'; blank.dapp = 'ideal'; blank.mirror = true; blank.mirror2 = true; blank['ff-dir'] = 'ahead'; blank['sub-dir'] = 'ahead'; CLK.forEach(function (k) { blank[k + '-qty'] = '1'; });
     MATS.forEach(function (m) { blank['mat-' + m[0]] = 'concrete'; });
     blank.dunit = $('dunit').value; blank.tunit = $('tunit').value;
     setAll(blank); mirrorSync(); render(); save();
@@ -978,7 +1028,7 @@ function model(i) {
 
 
   /* updates */
-  var APP_VERSION = '1.9.1', DEFAULT_UPDATE_URL = 'https://raw.githubusercontent.com/AudioninjaProductions/audioninja-step0/main/version.json', UK = 'ninja-upd-v1';
+  var APP_VERSION = '1.12.0', DEFAULT_UPDATE_URL = 'https://raw.githubusercontent.com/AudioninjaProductions/audioninja-step0/main/version.json', UK = 'ninja-upd-v1';
   var updUrl = DEFAULT_UPDATE_URL;
   try { var us = localStorage.getItem(UK); if (us) updUrl = us; } catch (e) {}
   $('verNow').textContent = APP_VERSION; $('updUrl').value = updUrl;
