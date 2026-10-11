@@ -1,5 +1,5 @@
 {
-  "version": "1.16.2",
+  "version": "1.18.0",
   "url": "https://github.com/AudioninjaProductions/audioninja-step0/blob/main/AudioNinja_Step0_Calculator_Team.html",
-  "notes": "Headroom table: continuous ceiling vs nominal target at unity gain at the front, middle and furthest audience, headroom, pass or short against a 40 dB goal (editable), with boxes-needed, doubling steps and the louder-model alternative."
+  "notes": "Delay rule kept: past the delay position the delay cluster follows inverse square to the furthest audience. New rows show the furthest audience with delays only and with Mains + delays."
 }

@@ -533,17 +533,32 @@ function model(i) {
       var hr = q[2] == null ? null : q[2] - target;
       return { label: q[0], dist: q[1], ceil: q[2], headroom: hr, delta: hr == null ? null : hr - goal };
     });
-    var worst = rows.filter(function (r) { return r.delta != null; }).reduce(function (b, r) { return !b || r.delta < b.delta ? r : b; }, null);
-    var q = out.rows.l.present ? out.rows.l.qty : null, mult = null;
+    var worst = rows[0].delta != null ? rows[0] : rows.filter(function (r) { return r.delta != null; }).reduce(function (b, r) { return !b || r.delta < b.delta ? r : b; }, null);
+    var mult = null, MAXB = 2, qL = i.clusters.l.qty;
     if (worst && worst.delta < 0) mult = Math.pow(10, -worst.delta / 10);
-    out.hr = { goal: goal, rows: rows, worst: worst, mult: mult, qty: i.clusters.l.qty };
-    if (worst && worst.delta < 0) flag('info', 'Headroom is below the ' + goal + ' dB goal at the ' + worst.label.toLowerCase(), 'The Mains-only continuous ceiling there is ' + worst.ceil.toFixed(1) + ' dB against a ' + target + ' dB nominal target, ' + worst.headroom.toFixed(1) + ' dB of headroom, ' + (-worst.delta).toFixed(1) + ' dB short. Each doubling of the Mains adds 3 dB.');
+    var need = mult != null && qL ? Math.ceil(qL * mult - 1e-9) : null;
+    var swap = worst && worst.delta < 0 && qL ? -worst.delta + 10 * Math.log10(qL / MAXB) : null;
+    out.hr = { goal: goal, rows: rows, worst: worst, mult: mult, qty: qL, maxBox: MAXB, need: need, swap: swap };
+    if (worst && worst.delta < 0) flag('info', 'Headroom is below the ' + goal + ' dB goal at the ' + worst.label.toLowerCase(), 'The Mains-only continuous ceiling there is ' + worst.ceil.toFixed(1) + ' dB against a ' + target + ' dB nominal target, ' + worst.headroom.toFixed(1) + ' dB of headroom, ' + (-worst.delta).toFixed(1) + ' dB short. The goal is judged at the front row. Each doubling of the Mains adds 3 dB.');
+    ['l', 'r', 'ff', 'dl', 'dr'].forEach(function (k) {
+      var r = out.rows[k];
+      if (r && r.present && i.clusters[k] && i.clusters[k].qty > MAXB) flag('warn', r.name + ' has more than ' + MAXB + ' boxes per cluster', 'A point-source cluster should stay at ' + MAXB + ' boxes or fewer. With ' + i.clusters[k].qty + ' the point-source model is stretched; change to a system with higher sensitivity or power instead (Bone\'s point-source rule).');
+    });
   })();
   if (i.mrow != null && i.far != null && (i.mrow > i.far || i.mrow < out.frowD)) flag('warn', 'Middle row is outside the audience depth', 'The middle row distance (' + i.mrow.toFixed(1) + ' m) should sit between the front row (' + out.frowD.toFixed(1) + ' m) and the furthest point (' + i.far.toFixed(1) + ' m).');
   var dAny = out.rows.dl.present ? out.rows.dl : out.rows.dr.present ? out.rows.dr : null;
   out.dAny = dAny;
   out.delayDist = dAny ? dAny.dist : null;
   out.atDelay = atD(out.mains, out.delayDist);
+  /* delay rule stands: past the delay position the delay cluster follows inverse square out to the furthest audience */
+  (function () {
+    var ds = [out.rows.dl, out.rows.dr].filter(function (r) { return r.present && r.spl1m != null; });
+    out.dlLvl = ds.length ? 10 * Math.log10(ds.reduce(function (a, r) { return a + Math.pow(10, r.spl1m / 10); }, 0)) : null;
+    out.dlFarD = dAny && i.far != null && out.delayDist != null ? i.far - out.delayDist : null;
+    out.atFarDelay = out.dlLvl != null && out.dlFarD != null ? atD(out.dlLvl, out.dlFarD) : null;
+    out.atFarBoth = out.atFarDelay != null && out.atFar != null ? 10 * Math.log10(Math.pow(10, out.atFar / 10) + Math.pow(10, out.atFarDelay / 10)) : null;
+    if (dAny && out.dlFarD != null && out.dlFarD < 1) flag('info', 'Delay position is at or beyond the furthest audience', 'The delay cluster is within 1 m of the furthest audience point (or past it), so its inverse-square level there is not estimated. Check the delay distance.');
+  })();
   if (out.mains != null && out.rows.sub.present && out.rows.sub.spl1m != null) out.subDiff = out.rows.sub.spl1m - out.mains;
   if (out.rows.ff.present && out.rows.ff.dist != null && out.rows.ff.dist < 1)
     flag('info', 'Center trim is a live job', 'The inverse-square formula is not valid inside 1 m. Set the Center level at the seat by ear and meter.');
@@ -760,15 +775,16 @@ function model(i) {
         var dif = (r.k === 'l' || r.k === 'r') ? '—' : (base != null && r.spl1m != null ? sg(r.spl1m - base) : '—');
         return '<tr><td>' + r.name + '</td><td class="n">' + f1(r.spl1m) + '</td><td class="n">' + dif + '</td></tr>';
       }).join('') + '<tr><td><b>Mains combined</b></td><td class="n">' + f1(res.mains) + '</td><td class="n">—</td></tr></tbody></table></div>' +
-      '<div class="wrap"><table><thead><tr><th>Mains-only position</th><th class="n">Distance (' + unit + ')</th><th class="n">SPL (dB)</th><th class="n">Vs target (dB)</th><th class="n">Vs front row (dB)</th></tr></thead><tbody>' +
+      '<div class="wrap"><table><thead><tr><th>Position (Mains-only unless marked)</th><th class="n">Distance (' + unit + ')</th><th class="n">SPL (dB)</th><th class="n">Vs target (dB)</th><th class="n">Vs front row (dB)</th></tr></thead><tbody>' +
       [['Front row', res.frowD, res.atFront], ['Middle row', res.midD, res.atMid], ['Furthest audience', res.far, res.atFar]].map(function (q) {
         return '<tr><td>' + q[0] + '</td><td class="n">' + dd(q[1]) + '</td><td class="n">' + f1(q[2]) + '</td><td class="n">' + sg(q[2] == null ? null : q[2] - res.target) + '</td><td class="n">' + (q[0] === 'Front row' ? '—' : sg(q[2] == null || res.atFront == null ? null : q[2] - res.atFront)) + '</td></tr>';
       }).join('') +
       (res.dAny ? '<tr><td>Delay position</td><td class="n">' + dd(res.delayDist) + '</td><td class="n">' + f1(res.atDelay) + '</td><td class="n">' + sg(res.atDelay == null ? null : res.atDelay - res.target) + '</td><td class="n">' + sg(res.atDelay == null || res.atFront == null ? null : res.atDelay - res.atFront) + '</td></tr>' : '') +
+      (res.dAny && res.atFarDelay != null ? '<tr><td>Furthest audience, delays only</td><td class="n">' + dd(res.dlFarD) + ' from delay</td><td class="n">' + f1(res.atFarDelay) + '</td><td class="n">' + sg(res.atFarDelay - res.target) + '</td><td class="n">' + sg(res.atFront == null ? null : res.atFarDelay - res.atFront) + '</td></tr><tr><td>Furthest audience, Mains + delays</td><td class="n">' + dd(res.far) + '</td><td class="n">' + f1(res.atFarBoth) + '</td><td class="n">' + sg(res.atFarBoth - res.target) + '</td><td class="n">' + sg(res.atFront == null ? null : res.atFarBoth - res.atFront) + '</td></tr>' : '') +
       '</tbody></table></div><p class="hint">Free-field inverse-square estimate: 20 log of the distance ratio below the 1 m level. Reflections and room gain will change the real figure.</p>' +
-      '<h3 style="margin:14px 0 6px">Headroom: continuous ceiling versus nominal target</h3><div class="wrap"><table><thead><tr><th>Position</th><th class="n">Continuous ceiling (dB)</th><th class="n">Nominal target at unity gain (dB)</th><th class="n">Headroom (dB)</th><th class="n">Vs ' + res.hr.goal + ' dB goal</th></tr></thead><tbody>' +
-      res.hr.rows.map(function (r) { return '<tr><td>' + r.label + '</td><td class="n">' + f1(r.ceil) + '</td><td class="n">' + res.target + '</td><td class="n">' + sg(r.headroom) + '</td><td class="n">' + (r.delta == null ? '—' : r.delta >= 0 ? 'Meets (' + sg(r.delta) + ')' : 'Short ' + f1(-r.delta)) + '</td></tr>'; }).join('') +
-      '</tbody></table></div>' + (res.hr.mult ? '<p class="note">To reach the ' + res.hr.goal + ' dB goal at the ' + res.hr.worst.label.toLowerCase() + ', ' + (res.hr.mult > 32 ? 'the gap is ' + (-res.hr.worst.delta).toFixed(1) + ' dB, which is not practical to close by adding boxes alone (it would take about ' + res.hr.mult.toFixed(0) + '× the boxes). Shorten the throw (add delays or fills), use higher-sensitivity boxes, or lower the goal. Doubling steps: ' : 'the Mains need about ' + res.hr.mult.toFixed(1) + '× the boxes (' + (res.hr.qty != null ? res.hr.qty + ' per side now, about ' + Math.ceil(res.hr.qty * res.hr.mult - 1e-9) + ' per side needed' : 'per side') + '). Doubling steps: ') + [1, 2, 4, 8, 16].map(function (m) { return '×' + m + ' = ' + sg(res.hr.worst.delta + 10 * Math.log10(m)) + ' dB'; }).join(', ') + '. ' + (-res.hr.worst.delta <= 10 ? 'Or keep the box count and swap to a model that is about +' + (-res.hr.worst.delta).toFixed(1) + ' dB louder per box (sensitivity + 10·log10 of RMS watts); a higher-sensitivity model is usually the cheaper route than piling on boxes. Shorter throws (delays or fills) or a lower target also close the gap.' : 'A model swap alone will not cover this much. If the gear cannot change, make do and maximize what is available: you have ' + res.hr.worst.headroom.toFixed(1) + ' dB of headroom at the ' + res.hr.worst.label.toLowerCase() + ' with the current rig. Shorten the throw with the delays or a fill, keep the target no higher than coverage needs, and set the real limits during calibration. This make-do guidance is general practice, not from the Scrolls.') + '</p>' : '') +
+      '<h3 style="margin:14px 0 6px">Headroom: continuous ceiling versus nominal target</h3><div class="wrap"><table><thead><tr><th>Position</th><th class="n">Continuous ceiling (dB)</th><th class="n">Nominal target at unity gain (dB)</th><th class="n">Headroom (dB)</th><th class="n">Front row vs ' + res.hr.goal + ' dB goal</th></tr></thead><tbody>' +
+      res.hr.rows.map(function (r) { return '<tr><td>' + r.label + '</td><td class="n">' + f1(r.ceil) + '</td><td class="n">' + res.target + '</td><td class="n">' + sg(r.headroom) + '</td><td class="n">' + (r.delta == null || r !== res.hr.worst ? '—' : r.delta >= 0 ? 'Meets (' + sg(r.delta) + ')' : 'Short ' + f1(-r.delta)) + '</td></tr>'; }).join('') +
+      '</tbody></table></div>' + (res.hr.mult ? '<p class="note">Headroom is judged at the front row: ' + sg(res.hr.worst.headroom) + ' dB against the ' + res.hr.goal + ' dB goal, ' + (-res.hr.worst.delta).toFixed(1) + ' dB short. ' + (res.hr.need != null && res.hr.need <= res.hr.maxBox ? 'Within the ' + res.hr.maxBox + '-box point-source limit, about ' + res.hr.need + ' per side would do it (' + res.hr.qty + ' now; each doubling adds 3 dB).' : 'Adding boxes would take about ' + res.hr.mult.toFixed(1) + '× the Mains, which is beyond the ' + res.hr.maxBox + '-box point-source limit per cluster. Recommended: change to a system with higher sensitivity' + (res.hr.swap != null ? '. With ' + res.hr.maxBox + ' boxes per side you need a model about ' + (res.hr.swap > 0 ? '+' + res.hr.swap.toFixed(1) + ' dB louder than the current one (sensitivity + 10·log10 of RMS watts).' : 'as loud as the current one, so fewer boxes would do.') : '.') + (res.hr.swap != null && res.hr.swap > 10 ? ' A model swap alone will not cover this much. If the gear cannot change, make do and maximize what is available: you have ' + res.hr.worst.headroom.toFixed(1) + ' dB of headroom at the front row with the current rig. Keep the target no higher than coverage needs and set the real limits during calibration. This make-do guidance is general practice, not from the Scrolls.' : '')) + '</p>' : '') +
       '<p class="hint">The ceiling is the continuous (RMS) level at full rated power, Mains only, free field. The target is the nominal SPL assumed at unity gain. Peaks, room gain and amp or DSP limits are not included.</p>' + chart(res, du, unit) + '</div>';
 
     var order = { bad: 0, warn: 1, info: 2 }, fl = res.flags.slice().sort(function (a, b) { return order[a.sev] - order[b.sev]; });
@@ -1231,7 +1247,7 @@ function model(i) {
 
 
   /* updates */
-  var APP_VERSION = '1.16.2', DEFAULT_UPDATE_URL = 'https://raw.githubusercontent.com/AudioninjaProductions/audioninja-step0/main/version.json', UK = 'ninja-upd-v1';
+  var APP_VERSION = '1.18.0', DEFAULT_UPDATE_URL = 'https://raw.githubusercontent.com/AudioninjaProductions/audioninja-step0/main/version.json', UK = 'ninja-upd-v1';
   var updUrl = DEFAULT_UPDATE_URL;
   try { var us = localStorage.getItem(UK); if (us) updUrl = us; } catch (e) {}
   $('verNow').textContent = APP_VERSION; $('updUrl').value = updUrl;
