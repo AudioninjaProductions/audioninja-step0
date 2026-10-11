@@ -348,6 +348,7 @@ Delay approach: Ideal</textarea></label>
           <label class="f" for="trim"><span>Trim height</span><input id="trim" type="number" inputmode="decimal" step="any" placeholder="blank = 2.75 m"></label>
           <label class="f" for="spread"><span>FOH L-R spread</span><input id="spread" type="number" inputmode="decimal" step="any" placeholder="blank = 6 m"></label>
           <label class="f" for="frow"><span>Front row distance from Mains</span><input id="frow" type="number" inputmode="decimal" step="any" placeholder="blank = 2 m"></label>
+          <label class="f" for="mrow"><span>Middle row distance from Mains</span><input id="mrow" type="number" inputmode="decimal" step="any" placeholder="blank = midway to the furthest point"></label>
         </div>
       </fieldset>
       <button type="button" class="primary" id="btn-see">See results</button>
@@ -393,6 +394,7 @@ function model(i) {
   ci.trim = chk(i.trim, 0, 500, 'Trim height', 'm');
   ci.spread = chk(i.spread, 0, 2000, 'FOH spread', 'm');
   ci.frow = chk(i.frow, 0, 2000, 'Front row distance', 'm');
+  ci.mrow = chk(i.mrow, 0, 2000, 'Middle row distance', 'm');
   ci.hAng = chk(i.hAng, 1, 179, 'Horizontal coverage', 'degrees');
   ci.vAng = chk(i.vAng, 1, 179, 'Vertical coverage', 'degrees');
   i = ci;
@@ -504,6 +506,17 @@ function model(i) {
   out.far = i.far;
   if (i.far == null) flag('bad', 'Furthest audience point missing', 'Needed to estimate the Mains level at the back.');
   out.atFar = atD(out.mains, i.far);
+  out.frowD = i.frow == null ? 2 : i.frow;
+  if (i.frow == null) dflt('Front row distance: 2 m from the Mains (assumption, verify on site).');
+  out.atFront = atD(out.mains, out.frowD);
+  out.midD = i.mrow != null ? i.mrow : (i.far != null ? (out.frowD + i.far) / 2 : null);
+  if (i.mrow == null && out.midD != null) dflt('Middle row distance: ' + out.midD.toFixed(1) + ' m, midway between the front row and the furthest point (assumption, verify on site).');
+  out.atMid = atD(out.mains, out.midD);
+  if (out.atFront != null && out.atMid != null) {
+    out.midDrop = out.atMid - out.atFront;
+    if (out.midDrop < -10) flag('info', 'Middle row drops more than 10 dB', 'Mains-only estimate is ' + out.midDrop.toFixed(1) + ' dB at the middle row against the front row. Per Ninja Calibration Step 4, deploy a time-aligned fill rather than pushing FOH level. Estimate only; confirm by walking the room.');
+  }
+  if (i.mrow != null && i.far != null && (i.mrow > i.far || i.mrow < out.frowD)) flag('warn', 'Middle row is outside the audience depth', 'The middle row distance (' + i.mrow.toFixed(1) + ' m) should sit between the front row (' + out.frowD.toFixed(1) + ' m) and the furthest point (' + i.far.toFixed(1) + ' m).');
   var dAny = out.rows.dl.present ? out.rows.dl : out.rows.dr.present ? out.rows.dr : null;
   out.dAny = dAny;
   out.delayDist = dAny ? dAny.dist : null;
@@ -565,7 +578,7 @@ function model(i) {
   var CLNAME = { l: 'FOH tops', r: 'FOH tops', ff: 'Center', sub: 'Subs', dl: 'Delay L', dr: 'Delay R' };
   var MATS = [['floor', 'Floor'], ['ceil', 'Ceiling'], ['stage', 'Stage wall'], ['back', 'Back wall'], ['left', 'Left wall'], ['right', 'Right wall']];
   var MOPT = [['concrete', 'Concrete'], ['glass', 'Glass'], ['tile', 'Tile'], ['brick', 'Brick'], ['drywall', 'Drywall'], ['wood', 'Wood'], ['curtain', 'Curtain'], ['panel', 'Acoustic panel'], ['open', 'Open or audience']];
-  var DISTIDS = ['roomL', 'roomW', 'roomH', 'far', 'awidth', 'trim', 'spread', 'frow', 'ff-dist', 'sub-dist', 'dl-dist'];
+  var DISTIDS = ['roomL', 'roomW', 'roomH', 'far', 'awidth', 'trim', 'spread', 'frow', 'mrow', 'ff-dist', 'sub-dist', 'dl-dist'];
   var CLK = ['l', 'r', 'ff', 'sub', 'dl', 'dr'];
   var $ = function (id) { return document.getElementById(id); };
   var KEY = 'ninja-step0-v1';
@@ -595,7 +608,7 @@ function model(i) {
   var EXAMPLE = {
     app: 'full', dapp: 'ideal', venue: 'indoor', venueName: '', lkEntry: 'Venue: \nSound system: \nApplication: Full range music\nDelay approach: Ideal', dunit: 'm', tunit: 'C', roomL: 20, roomW: 30, roomH: 4,
     'mat-floor': 'concrete', 'mat-ceil': 'concrete', 'mat-stage': 'concrete', 'mat-back': 'concrete', 'mat-left': 'concrete', 'mat-right': 'concrete',
-    temp: 30, target: '', far: 15.24, awidth: '', seats: '', trim: '', spread: '', frow: '',
+    temp: 30, target: '', far: 15.24, awidth: '', seats: '', trim: '', spread: '', frow: '', mrow: '',
     'l-qty': 1, 'l-w': 650, 'l-sens': '', 'l-peak': 127,
     'r-qty': 1, 'r-w': 650, 'r-sens': '', 'r-peak': 127, mirror: true,
     'ff-qty': 1, 'ff-w': 650, 'ff-sens': '', 'ff-peak': 127, 'ff-dist': 0.61, 'ff-dir': 'ahead',
@@ -646,7 +659,7 @@ function model(i) {
     return {
       app: $('app').value || 'full', dapp: $('dapp').value || 'ideal', venue: $('venue').value, roomL: d('roomL'), roomW: d('roomW'), roomH: d('roomH'), mats: mats,
       temp: T, target: val('target'), far: d('far'), awidth: d('awidth'), seats: val('seats'),
-      hAng: val('l-h'), vAng: val('l-v'), trim: d('trim'), spread: d('spread'), frow: d('frow'), alignRef: $('alignref') ? $('alignref').value : '',
+      hAng: val('l-h'), vAng: val('l-v'), trim: d('trim'), spread: d('spread'), frow: d('frow'), mrow: d('mrow'), alignRef: $('alignref') ? $('alignref').value : '',
       clusters: { l: cl('l', false), r: cl('r', false), ff: cl('ff', true), sub: cl('sub', true), dl: cl('dl', true), dr: cl('dr', false) }
     };
   };
@@ -723,9 +736,11 @@ function model(i) {
         var dif = (r.k === 'l' || r.k === 'r') ? '—' : (base != null && r.spl1m != null ? sg(r.spl1m - base) : '—');
         return '<tr><td>' + r.name + '</td><td class="n">' + f1(r.spl1m) + '</td><td class="n">' + dif + '</td></tr>';
       }).join('') + '<tr><td><b>Mains combined</b></td><td class="n">' + f1(res.mains) + '</td><td class="n">—</td></tr></tbody></table></div>' +
-      '<div class="wrap"><table><thead><tr><th>Mains-only position</th><th class="n">Distance (' + unit + ')</th><th class="n">SPL (dB)</th><th class="n">Vs target (dB)</th></tr></thead><tbody>' +
-      '<tr><td>Furthest audience</td><td class="n">' + dd(res.far) + '</td><td class="n">' + f1(res.atFar) + '</td><td class="n">' + sg(res.atFar == null ? null : res.atFar - res.target) + '</td></tr>' +
-      (res.dAny ? '<tr><td>Delay position</td><td class="n">' + dd(res.delayDist) + '</td><td class="n">' + f1(res.atDelay) + '</td><td class="n">' + sg(res.atDelay == null ? null : res.atDelay - res.target) + '</td></tr>' : '') +
+      '<div class="wrap"><table><thead><tr><th>Mains-only position</th><th class="n">Distance (' + unit + ')</th><th class="n">SPL (dB)</th><th class="n">Vs target (dB)</th><th class="n">Vs front row (dB)</th></tr></thead><tbody>' +
+      [['Front row', res.frowD, res.atFront], ['Middle row', res.midD, res.atMid], ['Furthest audience', res.far, res.atFar]].map(function (q) {
+        return '<tr><td>' + q[0] + '</td><td class="n">' + dd(q[1]) + '</td><td class="n">' + f1(q[2]) + '</td><td class="n">' + sg(q[2] == null ? null : q[2] - res.target) + '</td><td class="n">' + (q[0] === 'Front row' ? '—' : sg(q[2] == null || res.atFront == null ? null : q[2] - res.atFront)) + '</td></tr>';
+      }).join('') +
+      (res.dAny ? '<tr><td>Delay position</td><td class="n">' + dd(res.delayDist) + '</td><td class="n">' + f1(res.atDelay) + '</td><td class="n">' + sg(res.atDelay == null ? null : res.atDelay - res.target) + '</td><td class="n">' + sg(res.atDelay == null || res.atFront == null ? null : res.atDelay - res.atFront) + '</td></tr>' : '') +
       '</tbody></table></div><p class="hint">Free-field inverse-square estimate: 20 log of the distance ratio below the 1 m level. Reflections and room gain will change the real figure.</p>' + chart(res, du, unit) + '</div>';
 
     var order = { bad: 0, warn: 1, info: 2 }, fl = res.flags.slice().sort(function (a, b) { return order[a.sev] - order[b.sev]; });
@@ -747,6 +762,8 @@ function model(i) {
     L.push('Application: ' + ({ full: 'Full range music', acoustic: 'Acoustic, no drums or bass', speech: 'Speech only' }[inp.app] || 'Full range music'));
     L.push('Speed of sound: ' + (res.c == null ? 'missing' : res.c.toFixed(1) + ' m/s'));
     rows.forEach(function (r) { if (r.present) L.push(r.name + (inp.clusters[r.k].m ? ' [' + inp.clusters[r.k].m + ']' : '') + ' x' + inp.clusters[r.k].qty + ': ' + (r.isRef ? 'zero point, 0 ms' : (r.k === 'l' || r.k === 'r') ? f2(r.delayMs) + ' ms' : f2(r.delayMs) + ' ms at ' + dd(r.dist) + ' ' + unit + (r.dir === 'behind' ? ' behind' : '')) + ', ' + f1(r.spl1m) + ' dB at 1 m'); });
+    L.push('Front row (' + dd(res.frowD) + ' ' + unit + '): ' + f1(res.atFront) + ' dB Mains only, ' + sg(res.atFront == null ? null : res.atFront - res.target) + ' dB vs target');
+    L.push('Middle row (' + dd(res.midD) + ' ' + unit + '): ' + f1(res.atMid) + ' dB Mains only, ' + sg(res.midDrop == null ? null : res.midDrop) + ' dB vs front row');
     L.push('Mains combined: ' + f1(res.mains) + ' dB at 1 m; far point ' + f1(res.atFar) + ' dB; target ' + res.target + ' dB C Slow');
     fl.forEach(function (f) { L.push('[' + lab[f.sev] + '] ' + f.title + '. ' + f.text); });
     res.defaults.forEach(function (d) { L.push('[Default] ' + d); });
@@ -1032,7 +1049,7 @@ function model(i) {
 
 
   /* updates */
-  var APP_VERSION = '1.13.0', DEFAULT_UPDATE_URL = 'https://raw.githubusercontent.com/AudioninjaProductions/audioninja-step0/main/version.json', UK = 'ninja-upd-v1';
+  var APP_VERSION = '1.14.0', DEFAULT_UPDATE_URL = 'https://raw.githubusercontent.com/AudioninjaProductions/audioninja-step0/main/version.json', UK = 'ninja-upd-v1';
   var updUrl = DEFAULT_UPDATE_URL;
   try { var us = localStorage.getItem(UK); if (us) updUrl = us; } catch (e) {}
   $('verNow').textContent = APP_VERSION; $('updUrl').value = updUrl;

@@ -1,5 +1,5 @@
 {
-  "version": "1.13.0",
+  "version": "1.14.0",
   "url": "https://github.com/AudioninjaProductions/audioninja-step0/blob/main/AudioNinja_Step0_Calculator_Team.html",
-  "notes": "One Lookup entry box (Venue, Sound system, Application, Delay approach). Ask AI now fills known speakers from the model table automatically before opening the AI chat."
+  "notes": "Mains-only SPL at the front row, middle row and furthest point, with reference distance fields and the drop against the front row. Flags a middle row drop over 10 dB."
 }
