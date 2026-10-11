@@ -1012,7 +1012,7 @@ function model(i) {
 
 
   /* updates */
-  var APP_VERSION = '1.4.1', DEFAULT_UPDATE_URL = 'https://raw.githubusercontent.com/AudioninjaProductions/audioninja-step0/main/version.json', UK = 'ninja-upd-v1';
+  var APP_VERSION = '1.4.2', DEFAULT_UPDATE_URL = 'https://raw.githubusercontent.com/AudioninjaProductions/audioninja-step0/main/version.json', UK = 'ninja-upd-v1';
   var updUrl = DEFAULT_UPDATE_URL;
   try { var us = localStorage.getItem(UK); if (us) updUrl = us; } catch (e) {}
   $('verNow').textContent = APP_VERSION; $('updUrl').value = updUrl;
@@ -1274,6 +1274,42 @@ function model(i) {
   mkCopy($('lk-ask'), 'venue');
   document.querySelectorAll('.cl-ask').forEach(function (b) { var k = b.getAttribute('data-k'); if (k && $(k + '-model')) mkCopy(b, k === 'r' ? 'l' : k); });
   document.addEventListener('click', function (e) { var c = e.target.closest && e.target.closest('.cl-copy'); if (c) copyReq(c.getAttribute('data-t')); });
+
+  /* tolerant import: AI chats often reply with numbers as text ("28 m", "15 ft"), nested groups or different key names */
+  var ALIAS = { length: 'room_length_m', room_length: 'room_length_m', length_m: 'room_length_m', width: 'room_width_m', room_width: 'room_width_m', width_m: 'room_width_m', ceiling_height: 'ceiling_height_m', ceiling: 'ceiling_height_m', ceiling_m: 'ceiling_height_m', height: 'ceiling_height_m', height_m: 'ceiling_height_m', seats: 'capacity', seating_capacity: 'capacity', seating: 'capacity',
+    audience_width: 'audience_width_m', furthest_audience: 'furthest_audience_m', furthest_listener_m: 'furthest_audience_m', throw_m: 'furthest_audience_m', trim_height: 'trim_height_m', foh_spread: 'foh_spread_m',
+    rms_power_w: 'rms_watts', power_w: 'rms_watts', rms_power: 'rms_watts', rms: 'rms_watts', continuous_power_w: 'rms_watts', aes_power_w: 'rms_watts', sensitivity: 'sensitivity_db', sens_db: 'sensitivity_db', max_spl: 'peak_spl_db', max_spl_db: 'peak_spl_db', peak_spl: 'peak_spl_db', horizontal: 'horizontal_deg', horizontal_coverage: 'horizontal_deg', horizontal_coverage_deg: 'horizontal_deg', h_deg: 'horizontal_deg', vertical: 'vertical_deg', vertical_coverage: 'vertical_deg', vertical_coverage_deg: 'vertical_deg', v_deg: 'vertical_deg', model: 'speaker_model' };
+  var NUMF = ['room_length_m', 'room_width_m', 'ceiling_height_m', 'audience_width_m', 'furthest_audience_m', 'capacity', 'trim_height_m', 'foh_spread_m', 'rms_watts', 'sensitivity_db', 'peak_spl_db', 'horizontal_deg', 'vertical_deg'];
+  var toNum = function (v, key) {
+    if (typeof v === 'number') return v;
+    if (typeof v !== 'string') return v;
+    var m = v.replace(/,/g, '').match(/-?\d+(?:\.\d+)?/); if (!m) return v;
+    var n = parseFloat(m[0]), s = v.toLowerCase();
+    if (/_m$/.test(key)) { if (/\b(ft|feet|foot)\b|'/.test(s)) n *= 0.3048; else if (/\bcm\b/.test(s)) n /= 100; }
+    return n;
+  };
+  var normLookup = function (o) {
+    if (!o || typeof o !== 'object' || Array.isArray(o)) return o;
+    var out = {}, keep = { boundaries: 1, sources: 1 };
+    var walk = function (src, depth) {
+      Object.keys(src).forEach(function (k0) {
+        var v = src[k0], k = String(k0).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, ''), key = ALIAS[k] || k;
+        if (v && typeof v === 'object' && !Array.isArray(v) && !keep[key] && depth < 3) { if (key === 'coverage') { out.coverage = v; } walk(v, depth + 1); return; }
+        if (out[key] == null || (depth === 0)) out[key] = v;
+      });
+    };
+    walk(o, 0);
+    NUMF.forEach(function (f) { if (out[f] != null) out[f] = toNum(out[f], f); });
+    if (typeof out.coverage === 'string') { var mm = out.coverage.match(/(\d+(?:\.\d+)?)\D+(\d+(?:\.\d+)?)/); if (mm) { if (out.horizontal_deg == null) out.horizontal_deg = parseFloat(mm[1]); if (out.vertical_deg == null) out.vertical_deg = parseFloat(mm[2]); } delete out.coverage; }
+    if (typeof out.type === 'string') { var t = out.type.toLowerCase(); out.type = /outdoor|open.?air|open/.test(t) && !/indoor/.test(t) ? 'outdoor' : /indoor|covered|enclosed|hall|arena|gym/.test(t) ? 'indoor' : out.type; }
+    if (out.boundaries && typeof out.boundaries === 'object') { var bb = {}; Object.keys(out.boundaries).forEach(function (k) { var val = out.boundaries[k]; bb[String(k).toLowerCase()] = typeof val === 'string' ? val.toLowerCase().trim() : val; }); out.boundaries = bb; }
+    return out;
+  };
+  var _al = applyLookup; applyLookup = function (o, t) { return _al(normLookup(o), t); };
+  var _done = done; done = function (n) {
+    if (n) { _done(n); return; }
+    lkmsg('Nothing usable was found. The reply needs numbers under keys like room_length_m, room_width_m, ceiling_height_m (meters) or rms_watts, sensitivity_db, peak_spl_db. Use the Copy request for AI chat button so the AI answers in the right shape, or paste the reply again.');
+  };
   $('dbUpdate').addEventListener('click', function () {
     var mm = $('mMsg'); dbUrl = $('dbUrl').value.trim() || dbUrl;
     if (!/^https:\/\//i.test(dbUrl) || navigator.onLine === false) { mm.textContent = ''; return; }

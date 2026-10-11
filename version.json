@@ -1,5 +1,5 @@
 {
-  "version": "1.4.1",
+  "version": "1.4.2",
   "url": "https://github.com/AudioninjaProductions/audioninja-step0/blob/main/AudioNinja_Step0_Calculator_Team.html",
-  "notes": "New Copy request for AI chat button next to every lookup button, so you can run any lookup in your own AI chat and paste the reply into Import lookup data."
+  "notes": "Fix: Fill fields now accepts AI replies with numbers as text (\"28 m\", \"92 ft\"), nested groups and different key names, and says what is wrong when nothing fills."
 }

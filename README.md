@@ -71,6 +71,7 @@ To update it: edit `brands.json` on GitHub, add brands in the same shape (`n` na
 
 ## Version history
 
+- **1.4.2** Fix: Import lookup data / Fill fields did not fill when the AI wrote numbers as text, in feet, or in nested groups. Now handled, with a clearer message when nothing matches.
 - **1.4.1** Copy request for AI chat button beside each lookup button (venue and every cluster).
 - **1.4.0** Save this model to the list, per cluster, with copy/download of saved models.
 - **1.3.0** Speaker model spec table with offline autofill per cluster, models in Update database, Database tab, Help section on models.
