@@ -1,5 +1,5 @@
 {
-  "version": "1.18.0",
+  "version": "1.18.2",
   "url": "https://github.com/AudioninjaProductions/audioninja-step0/blob/main/AudioNinja_Step0_Calculator_Team.html",
-  "notes": "Delay rule kept: past the delay position the delay cluster follows inverse square to the furthest audience. New rows show the furthest audience with delays only and with Mains + delays."
+  "notes": "New Metal surface option (steel deck, roof, rafters) counted as reflective; lookup replies mapping steel, corrugated or aluminum to Metal; fixed ceiling material not filling from lookup replies."
 }

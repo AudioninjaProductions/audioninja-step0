@@ -371,7 +371,7 @@ Delay approach: Ideal</textarea></label>
 
 <script>
 /* ---------- Pure model: metric units (m, deg C), null for blank ---------- */
-var HIGH = ['concrete', 'glass', 'tile', 'brick'];
+var HIGH = ['concrete', 'glass', 'tile', 'brick', 'metal'];
 function model(i) {
   var out = { flags: [], defaults: [], rows: {}, c: null };
   var flag = function (sev, title, text) { out.flags.push({ sev: sev, title: title, text: text }); };
@@ -615,7 +615,7 @@ function model(i) {
   ];
   var CLNAME = { l: 'FOH tops', r: 'FOH tops', ff: 'Center', sub: 'Subs', dl: 'Delay L', dr: 'Delay R' };
   var MATS = [['floor', 'Floor'], ['ceil', 'Ceiling'], ['stage', 'Stage wall'], ['back', 'Back wall'], ['left', 'Left wall'], ['right', 'Right wall']];
-  var MOPT = [['concrete', 'Concrete'], ['glass', 'Glass'], ['tile', 'Tile'], ['brick', 'Brick'], ['drywall', 'Drywall'], ['wood', 'Wood'], ['curtain', 'Curtain'], ['panel', 'Acoustic panel'], ['open', 'Open or audience']];
+  var MOPT = [['concrete', 'Concrete'], ['glass', 'Glass'], ['tile', 'Tile'], ['brick', 'Brick'], ['metal', 'Metal (steel deck, roof, rafters)'], ['drywall', 'Drywall'], ['wood', 'Wood'], ['curtain', 'Curtain'], ['panel', 'Acoustic panel'], ['open', 'Open or audience']];
   var DISTIDS = ['roomL', 'roomW', 'roomH', 'far', 'awidth', 'trim', 'spread', 'frow', 'mrow', 'ff-dist', 'sub-dist', 'dl-dist'];
   var CLK = ['l', 'r', 'ff', 'sub', 'dl', 'dr'];
   var $ = function (id) { return document.getElementById(id); };
@@ -1002,7 +1002,8 @@ function model(i) {
     put('spread', cv.foh_spread_m != null ? cv.foh_spread_m : o.foh_spread_m, 'FOH L-R spread', true);
     var b = o.boundaries && typeof o.boundaries === 'object' ? o.boundaries : {};
     MATS.forEach(function (m) {
-      var v = b[m[0]];
+      var v = b[m[0]] != null ? b[m[0]] : (m[0] === 'ceil' ? b.ceiling : undefined);
+      if (typeof v === 'string' && MATKEYS.indexOf(v) < 0 && /metal|steel|iron|alumin|corrugat|tin roof|sheet roof/i.test(v)) v = 'metal';
       if (MATKEYS.indexOf(v) >= 0) { $('mat-' + m[0]).value = v; $('mat-' + m[0]).classList.add('lk'); changed.push(m[1] + ': ' + v); }
     });
     /* speaker block: goes to one cluster */
@@ -1247,7 +1248,7 @@ function model(i) {
 
 
   /* updates */
-  var APP_VERSION = '1.18.0', DEFAULT_UPDATE_URL = 'https://raw.githubusercontent.com/AudioninjaProductions/audioninja-step0/main/version.json', UK = 'ninja-upd-v1';
+  var APP_VERSION = '1.18.2', DEFAULT_UPDATE_URL = 'https://raw.githubusercontent.com/AudioninjaProductions/audioninja-step0/main/version.json', UK = 'ninja-upd-v1';
   var updUrl = DEFAULT_UPDATE_URL;
   try { var us = localStorage.getItem(UK); if (us) updUrl = us; } catch (e) {}
   $('verNow').textContent = APP_VERSION; $('updUrl').value = updUrl;
