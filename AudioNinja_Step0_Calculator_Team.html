@@ -182,8 +182,8 @@ summary { cursor: pointer; font-weight: 600; font-size: 14px; }
     <ol>
       <li>Type the venue name and city at the top. Type a speaker model inside each cluster that has one.</li>
       <li><b>Paste a search result into a cluster:</b> open <i>Paste spec text or load a file</i> under any cluster, paste the specs from a web page or data sheet (or load a .txt, .csv, .md, .json or .html file), and press <b>Read specs</b>. It picks out RMS or continuous watts, sensitivity, max SPL, coverage and (for subs) the pattern, and shows the matched lines under Results so you can check them. PDFs cannot be read here: copy the spec table out of the PDF and paste it.</li>
-      <li><b>No AI needed for known speakers:</b> type the speakers in the <b>sound system box</b>, for example <i>2x Mackie Thump212XT mains + 2x Mackie Thump118S subs</i>, and press <b>Fill speakers from the sound system box</b>. Models in the built-in table fill their cluster with quantity and manufacturer specs, offline. The same box is also applied after an AI import, so the speakers fill even if the AI reply has none.</li>
-      <li><b>Venue and sound system in one go:</b> type the venue (or a description such as <i>indoor basketball court, Valenzuela</i>) and, if you like, the speakers you want to use in the sound system box. Press <b>Ask AI to look up the venue and sound system</b>. The request is copied and your AI chat opens. Send it, copy the AI's whole reply, come back and press <b>Paste AI reply and fill</b>. The room, the mains, center, subs and delay fill are all filled at once, with quantities. Models in the built-in table take their specs from the manufacturer data sheet, not from the AI. Undo import reverts everything.</li>
+      <li><b>One lookup entry:</b> fill the four lines in the <b>Lookup entry</b> box: <i>Venue:</i> a name and city or a description such as <i>covered basketball court, Valenzuela City</i>; <i>Sound system:</i> for example <i>2x Mackie Thump212XT tops + 2x Mackie Thump118S subs</i>, or leave it blank to ask the AI for the installed system; <i>Application:</i> Full range music, Acoustic or Speech only; <i>Delay approach:</i> Ideal or Budget. The Application and Delay approach lines set the selectors, and the selectors update the lines.</li>
+      <li><b>Ask AI to look up the venue and sound system:</b> reads the entry, fills every speaker it finds in the built-in table straight away (quantity and manufacturer specs, offline, no extra button), then copies a request for the venue and anything not in the table and opens your AI chat. Send it, copy the AI's whole reply, come back and press <b>Paste AI reply and fill</b>. Models in the built-in table keep their data sheet specs, not the AI's numbers. Undo import reverts everything.</li>
       <li>Each cluster has its own <b>Ask AI about this speaker</b> button. If the model is in the built-in table it fills instantly and offline. If not, it copies a request and opens your AI chat the same way. Choose Claude, ChatGPT or Gemini under <b>AI chat to open for lookups</b>. Anything not found stays blank so you can type it. Filled fields get a blue edge: they are unverified until you confirm them.</li>
       <li>No AI key is needed or stored. The page cannot call an AI itself, so the AI step always happens in your own AI chat. If your browser blocks reading the clipboard, paste the reply into <b>Import lookup data</b> and press <b>Fill fields</b>.</li>
       <li><b>Undo import</b> restores your values from before the last lookup. Always check the sources shown under Results.</li>
@@ -261,7 +261,11 @@ summary { cursor: pointer; font-weight: 600; font-size: 14px; }
       <fieldset id="lookup">
         <legend>Lookup</legend>
         <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(12rem,1fr))">
-          <label class="f" for="venueName"><span>Venue name and city</span><input id="venueName" type="text" autocomplete="off"></label>
+          <label class="f" for="lkEntry" style="grid-column:1/-1"><span>Lookup entry (venue, speakers, application)</span><textarea id="lkEntry" class="ta" rows="4" spellcheck="false">Venue: 
+Sound system: 
+Application: Full range music
+Delay approach: Ideal</textarea></label>
+          <input id="venueName" type="hidden">
         </div>
         <div class="copyrow">
           <a id="lk-web" class="btn" target="_blank" rel="noopener" hidden>Search the web</a>
@@ -589,7 +593,7 @@ function model(i) {
   }).join('');
 
   var EXAMPLE = {
-    app: 'full', dapp: 'ideal', venue: 'indoor', venueName: '', dunit: 'm', tunit: 'C', roomL: 20, roomW: 30, roomH: 4,
+    app: 'full', dapp: 'ideal', venue: 'indoor', venueName: '', lkEntry: 'Venue: \nSound system: \nApplication: Full range music\nDelay approach: Ideal', dunit: 'm', tunit: 'C', roomL: 20, roomW: 30, roomH: 4,
     'mat-floor': 'concrete', 'mat-ceil': 'concrete', 'mat-stage': 'concrete', 'mat-back': 'concrete', 'mat-left': 'concrete', 'mat-right': 'concrete',
     temp: 30, target: '', far: 15.24, awidth: '', seats: '', trim: '', spread: '', frow: '',
     'l-qty': 1, 'l-w': 650, 'l-sens': '', 'l-peak': 127,
@@ -848,7 +852,7 @@ function model(i) {
   $('btn-example').addEventListener('click', function () { setAll(EXAMPLE); curD = 'm'; curT = 'C'; mirrorSync(); render(); save(); });
   $('btn-clear').addEventListener('click', function () {
     var blank = {}; ids.forEach(function (id) { blank[id] = ''; });
-    blank.venue = 'indoor'; blank.app = 'full'; blank.dapp = 'ideal'; blank.mirror = true; blank.mirror2 = true; blank['ff-dir'] = 'ahead'; blank['sub-dir'] = 'ahead'; CLK.forEach(function (k) { blank[k + '-qty'] = '1'; });
+    blank.venue = 'indoor'; blank.app = 'full'; blank.dapp = 'ideal'; blank.lkEntry = 'Venue: \nSound system: \nApplication: Full range music\nDelay approach: Ideal'; blank.mirror = true; blank.mirror2 = true; blank['ff-dir'] = 'ahead'; blank['sub-dir'] = 'ahead'; CLK.forEach(function (k) { blank[k + '-qty'] = '1'; });
     MATS.forEach(function (m) { blank['mat-' + m[0]] = 'concrete'; });
     blank.dunit = $('dunit').value; blank.tunit = $('tunit').value;
     setAll(blank); mirrorSync(); render(); save();
@@ -984,9 +988,9 @@ function model(i) {
   var CHK = 'ninja-chat-v1';
   try { var cv = localStorage.getItem(CHK); if (cv && CHATS[cv]) $('chatSel').value = cv; } catch (e) {}
   $('chatSel').addEventListener('change', function () { try { localStorage.setItem(CHK, $('chatSel').value); } catch (e) {} });
-  var notInTable = '';
+  var notInTable = '', askPre = '';
   var doAsk = function (target) {
-    notInTable = '';
+    notInTable = target === 'venue' ? askPre : '';
     if (target !== 'venue') {
       var mt = $(target + '-model') ? $(target + '-model').value : '', hit = modelFind(mt);
       if (hit) {
@@ -1028,7 +1032,7 @@ function model(i) {
 
 
   /* updates */
-  var APP_VERSION = '1.12.0', DEFAULT_UPDATE_URL = 'https://raw.githubusercontent.com/AudioninjaProductions/audioninja-step0/main/version.json', UK = 'ninja-upd-v1';
+  var APP_VERSION = '1.13.0', DEFAULT_UPDATE_URL = 'https://raw.githubusercontent.com/AudioninjaProductions/audioninja-step0/main/version.json', UK = 'ninja-upd-v1';
   var updUrl = DEFAULT_UPDATE_URL;
   try { var us = localStorage.getItem(UK); if (us) updUrl = us; } catch (e) {}
   $('verNow').textContent = APP_VERSION; $('updUrl').value = updUrl;
@@ -1331,6 +1335,7 @@ function model(i) {
     var sh = $('sysHint') ? $('sysHint').value.trim() : '';
     return 'Lookup for my AudioNinja Step 0 Calculator (live sound system design).\n' +
       'Venue: ' + v + '\n' +
+      'Application: ' + ({ full: 'full range music (DJ and live band with drums and bass), so include subwoofers if the system has them', acoustic: 'acoustic, no drums or bass, so leave out "sub"', speech: 'speech only, so leave out "sub"' }[$('app').value] || 'full range music') + '\n' +
       'Sound system: ' + (sh ? 'I want to use: ' + sh + '. Use exactly these models, and look up their specs.' : 'find the venue\'s installed house sound system, if one is published.') + '\n\n' +
       'Do this with web search:\n' +
       '1. VENUE. If this names a specific venue, find it. If it only describes a type of venue, choose one well documented example, name it in "venue", and say so in "notes". Find room dimensions, ceiling height, audience area, capacity and the main wall, floor and ceiling materials. If the venue is a standard court and only the court type is known, use the published standard court size and mark it "estimated".\n' +
@@ -1341,13 +1346,68 @@ function model(i) {
   };
   var _askPrompt = askPrompt; askPrompt = function (t) { return t === 'venue' ? fullPrompt() : _askPrompt(t); };
   (function () {
-    var vl = $('venueName') && $('venueName').closest('label'); if (!vl || $('sysHint')) return;
-    var lb = document.createElement('label'); lb.className = 'f'; lb.setAttribute('for', 'sysHint');
-    var sp = document.createElement('span'); sp.textContent = 'House or proposed sound system (optional)';
-    var inp = document.createElement('input'); inp.id = 'sysHint'; inp.type = 'text'; inp.autocomplete = 'off'; inp.placeholder = 'e.g. Mackie Thump212XT tops + Thump118S subs, or leave blank for the venue\'s own system';
-    lb.appendChild(sp); lb.appendChild(inp); vl.parentNode.insertBefore(lb, vl.nextSibling);
+    var le = $('lkEntry'); if (!le || $('sysHint')) return;
+    var lb = document.createElement('label'); lb.hidden = true;
+    var inp = document.createElement('input'); inp.id = 'sysHint'; inp.type = 'hidden'; lb.appendChild(inp);
+    le.closest('label').parentNode.appendChild(lb);
     var ak = $('lk-ask'); if (ak) ak.textContent = 'Ask AI to look up the venue and sound system';
   })();
+  /* one lookup entry: Venue / Sound system / Application / Delay approach */
+  var ENTRY_T = 'Venue: \nSound system: \nApplication: Full range music\nDelay approach: Ideal';
+  var APPL = { full: 'Full range music', acoustic: 'Acoustic', speech: 'Speech only' }, DAPL = { ideal: 'Ideal', budget: 'Budget' };
+  var ENTRY_RE = /^\s*(venue|sound\s*system|speakers?|system|application|app|delay\s*approach|delay)\s*[:=]\s*(.*)$/i;
+  var entryParse = function () {
+    var o = { venue: '', sys: '', app: '', dapp: '', labeled: false }, free = [];
+    String($('lkEntry').value || '').split(/\r?\n/).forEach(function (ln) {
+      var m = ln.match(ENTRY_RE);
+      if (!m) { if (ln.trim()) free.push(ln.trim()); return; }
+      o.labeled = true;
+      var key = m[1].toLowerCase().replace(/\s+/g, ' '), v = m[2].trim();
+      if (/^<.*>$/.test(v) || (/[|]/.test(v) && /<|>/.test(v))) v = '';
+      if (key === 'venue') o.venue = v;
+      else if (/sound|speaker|system/.test(key)) o.sys = v;
+      else if (/^app/.test(key)) o.app = /acoust/i.test(v) ? 'acoustic' : /speech|talk|preach|sermon|lecture/i.test(v) ? 'speech' : /full|music|dj|band|concert/i.test(v) ? 'full' : '';
+      else o.dapp = /budget|10/i.test(v) ? 'budget' : /ideal|6/i.test(v) ? 'ideal' : '';
+    });
+    if (!o.labeled && free.length) o.venue = free.join(' ');
+    return o;
+  };
+  var entrySync = function () {
+    var o = entryParse();
+    $('venueName').value = o.venue.slice(0, 160);
+    $('sysHint').value = o.sys.slice(0, 300);
+    if (o.app) $('app').value = o.app;
+    if (o.dapp) $('dapp').value = o.dapp;
+    updateLinks(); render(); save();
+    return o;
+  };
+  var entrySetLine = function (key, val) {
+    var le = $('lkEntry'), lines = String(le.value || '').split(/\r?\n/), re = new RegExp('^\\s*' + key + '\\s*[:=]', 'i'), done = false;
+    lines = lines.map(function (ln) { if (!done && re.test(ln)) { done = true; return key + ': ' + val; } return ln; });
+    if (!done) lines.push(key + ': ' + val);
+    le.value = lines.join('\n');
+  };
+  $('lkEntry').addEventListener('input', function () { entrySync(); });
+  document.addEventListener('change', function (e) {
+    if (e.target.id === 'app') { entrySetLine('Application', APPL[e.target.value] || ''); $('venueName').value = entryParse().venue; save(); }
+    if (e.target.id === 'dapp') { entrySetLine('Delay approach', DAPL[e.target.value] || ''); save(); }
+  });
+  (function () { /* older saved forms: bring the saved venue name into the entry box */
+    var o = entryParse();
+    if (!o.venue && $('venueName').value) entrySetLine('Venue', $('venueName').value);
+    entrySetLine('Application', APPL[$('app').value] || 'Full range music'); entrySetLine('Delay approach', DAPL[$('dapp').value] || 'Ideal');
+    $('sysHint').value = entryParse().sys;
+  })();
+  /* Ask AI: read the entry, fill the speakers from the model table first, then build the request */
+  var prepEntry = function () {
+    var snap = getAll(), o = entrySync();
+    askPre = '';
+    if (!o.venue) { lkmsg('Type the venue after "Venue:" in the lookup entry first, for example "Covered basketball court, Valenzuela City, Philippines".'); return false; }
+    var n = o.sys ? applySys(false) : 0;
+    if (n) { lkSnap = snap; $('btn-undo').hidden = false; mirrorSync(); updateLinks(); render(); save(); askPre = 'Filled ' + n + ' speaker fields from the built-in table. '; }
+    return true;
+  };
+  var _doAskE = doAsk; doAsk = function (t) { if (t === 'venue' && !prepEntry()) return; _doAskE(t); };
   var applyMulti = function (o, target) {
     var snap = getAll(), changed = [], src = [], notes = [], total = 0, names = [];
     var take = function (n) { total += n || 0; if (n && lookupInfo) { changed = changed.concat(lookupInfo.changed); (lookupInfo.sources || []).forEach(function (s) { if (!src.some(function (x) { return x.url === s.url && x.field === s.field; })) src.push(s); }); if (lookupInfo.notes) notes.push(lookupInfo.notes); } };
@@ -1456,7 +1516,7 @@ function model(i) {
     }
     return n;
   };
-  var sysBtn = document.createElement('button'); sysBtn.type = 'button'; sysBtn.id = 'sysFill'; sysBtn.textContent = 'Fill speakers from the sound system box';
+  var sysBtn = document.createElement('button'); sysBtn.type = 'button'; sysBtn.id = 'sysFill'; sysBtn.textContent = 'Fill speakers from the sound system box'; sysBtn.hidden = true;
   if ($('sysHint')) { $('sysHint').closest('label').parentNode.insertBefore(sysBtn, $('sysHint').closest('label').nextSibling); }
   sysBtn.addEventListener('click', function () {
     var box = $('sysHint').value.trim();
@@ -1531,6 +1591,7 @@ function model(i) {
   /* Clear all also wipes the lookup helpers: sound system box, pasted text and files, import box, markers, undo */
   $('btn-clear').addEventListener('click', function () {
     if ($('sysHint')) $('sysHint').value = '';
+    $('lkEntry').value = ENTRY_T; $('venueName').value = '';
     $('importBox').value = '';
     document.querySelectorAll('textarea[id$="-paste"]').forEach(function (t) { t.value = ''; });
     document.querySelectorAll('input[type="file"]').forEach(function (f) { try { f.value = ''; } catch (e) {} });

@@ -1,5 +1,5 @@
 {
-  "version": "1.12.0",
+  "version": "1.13.0",
   "url": "https://github.com/AudioninjaProductions/audioninja-step0/blob/main/AudioNinja_Step0_Calculator_Team.html",
-  "notes": "New Delay approach: Ideal design (delays where the Mains drop 6 dB) or Budget (10 dB, for venues that cannot afford delay clusters, such as small churches)."
+  "notes": "One Lookup entry box (Venue, Sound system, Application, Delay approach). Ask AI now fills known speakers from the model table automatically before opening the AI chat."
 }

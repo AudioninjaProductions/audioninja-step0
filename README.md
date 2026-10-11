@@ -69,6 +69,7 @@ To update it: edit `brands.json` on GitHub, add brands in the same shape (`n` na
 
 ## Version history
 
+- **1.13.0** Standard Lookup entry: one box with Venue, Sound system, Application and Delay approach lines (reset by Clear all). Ask AI reads it, fills every speaker found in the built-in table immediately (no separate fill button), then builds the AI request including the application. The selectors and the lines stay in sync.
 - **1.12.0** Delay approach selector. Ideal design places and tests delays at the 6 dB drop point (one doubling of distance). Budget uses the 10 dB drop from the Scrolls' Step 4 fill threshold, for venues that cannot pay for delay clusters. Only sets the default when the Delay L distance is blank.
 - **1.11.1** Peer-review checks: warning if the front row distance or a typed delay distance is beyond the furthest audience point.
 - **1.11.0** Application criteria: Full range music (DJ, band with drums and bass) uses every cluster; Acoustic (no drums or bass) and Speech only leave the subs out of the delay, level and CalTemp estimate (typed sub values are kept). Delay and Center prediction apply to all three. Saved with the form and in the summary.
