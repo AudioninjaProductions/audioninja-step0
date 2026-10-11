@@ -1,5 +1,5 @@
 {
-  "version": "1.8.0",
+  "version": "1.9.1",
   "url": "https://github.com/AudioninjaProductions/audioninja-step0/blob/main/AudioNinja_Step0_Calculator_Team.html",
-  "notes": "New Alignment reference option: the cluster farthest from the listening position is the zero-delay point (Auto), or pick Mains, Subs or Center. Delays, results and CalTemp follow it."
+  "notes": "Delay distance now defaults to where the Mains-only level falls 6 dB below the target SPL when left blank. Delay is split into Delay L and Delay R."
 }

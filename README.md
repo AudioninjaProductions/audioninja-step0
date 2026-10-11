@@ -69,6 +69,8 @@ To update it: edit `brands.json` on GitHub, add brands in the same shape (`n` na
 
 ## Version history
 
+- **1.9.1** Default delay distance: leave the Delay L distance blank and it is set to where the Mains-only level (inverse square) falls 6 dB below the target SPL, listed under Defaults applied. A flag appears if that is beyond the furthest audience point.
+- **1.9.0** Delay is now Delay L and Delay R, like the FOH pair. Delay R follows Delay L by default (same speaker, quantity and distance, one timing for the pair); untick "Same as Delay L" to enter it separately. Imports accept "delay_right", "fill_r" and similar names; a single delay entry fills both sides.
 - **1.8.0** Alignment reference: Auto picks the cluster farthest from the listening position as the zero point (Mains, Subs or Center can also be chosen). All delays, the results table, CalTemp passes and the summary follow it. Mains ahead of the subs now gives the Mains the delay.
 - **1.7.1** Clear all also clears the sound system box, per-cluster pasted text and files, the import box, lookup markers and undo.
 - **1.7.0** AI settings and API keys removed. Ask AI copies the request and opens the chosen AI chat, Paste AI reply and fill brings the reply back. Copy request, Read with AI and Extract with AI buttons removed.

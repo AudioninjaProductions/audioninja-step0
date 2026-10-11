@@ -357,8 +357,8 @@ function model(i) {
   };
   var ci = {}; for (var kk in i) ci[kk] = i[kk];
   ci.clusters = {};
-  ['l', 'r', 'ff', 'sub', 'dl'].forEach(function (k) {
-    var o = i.clusters[k], n = (k === 'l' ? 'FOH-L' : k === 'r' ? 'FOH-R' : k === 'ff' ? 'Center' : k === 'sub' ? 'Sub' : 'Delay Fill');
+  ['l', 'r', 'ff', 'sub', 'dl', 'dr'].forEach(function (k) {
+    var o = i.clusters[k] || {}, n = (k === 'l' ? 'FOH-L' : k === 'r' ? 'FOH-R' : k === 'ff' ? 'Center' : k === 'sub' ? 'Sub' : k === 'dl' ? 'Delay L' : 'Delay R');
     ci.clusters[k] = { qty: chk(o.qty, 0, 1000, n + ' quantity'), w: chk(o.w, 0, 1e6, n + ' watts', 'W'), sens: chk(o.sens, 0, 150, n + ' sensitivity', 'dB'), peak: chk(o.peak, 0, 200, n + ' peak SPL', 'dB'), dist: o.dist == null ? o.dist : chk(o.dist, 0, 2000, n + ' distance', 'm'), dir: o.dir,
       m: o.m || '', cfg: o.cfg || '', pat: o.pat || '', h: o.h == null ? null : chk(o.h, 1, 360, n + ' horizontal coverage', 'degrees'), v: o.v == null ? null : chk(o.v, 1, 360, n + ' vertical coverage', 'degrees'),
       touched: o.w != null || o.sens != null || o.peak != null || o.dist != null || !!o.m || !!o.cfg || !!o.pat || o.h != null || o.v != null };
@@ -388,8 +388,8 @@ function model(i) {
 
   var usedPeak = false;
   var sp = [CFGN[i.clusters.sub.cfg], PATN[i.clusters.sub.pat]].filter(Boolean);
-  var names = { l: 'FOH-L', r: 'FOH-R', ff: 'Center', sub: sp.length ? 'Sub (' + sp.join(', ') + ')' : 'Sub', dl: 'Delay Fill' };
-  ['l', 'r', 'ff', 'sub', 'dl'].forEach(function (k) {
+  var names = { l: 'FOH-L', r: 'FOH-R', ff: 'Center', sub: sp.length ? 'Sub (' + sp.join(', ') + ')' : 'Sub', dl: 'Delay L', dr: 'Delay R' };
+  ['l', 'r', 'ff', 'sub', 'dl', 'dr'].forEach(function (k) {
     if (k === 'sub' && present(i.clusters.sub, 'sub') && i.clusters.sub.cfg === 'lr' && i.clusters.sub.dist == null) { i.clusters.sub.dist = 0; dflt('Sub distance: 0 (L/R stacked with FOH, so the subs sit at the Mains reference).'); }
     var cl = i.clusters[k], row = { k: k, name: names[k], present: present(cl, k), spl1m: null, delayMs: null, dist: cl.dist, dir: cl.dir, behind: false, how: null };
     if (row.present) {
@@ -399,14 +399,28 @@ function model(i) {
       if (box == null) flag('bad', names[k] + ' level missing', 'Enter sensitivity with RMS watts, or the rated peak SPL at 1 m, so its level can be estimated.');
       else row.spl1m = box + 10 * Math.log10(cl.qty);
       if (k === 'l' || k === 'r') row.pos = 0;
+      else if (cl.dist == null && (k === 'dl' || k === 'dr')) row.autoDist = true;
       else if (cl.dist == null) flag('bad', names[k] + ' distance missing', 'A delay estimate needs the distance from the Mains.');
       else row.pos = cl.dir === 'behind' ? -cl.dist : cl.dist;
     }
     out.rows[k] = row;
   });
+  /* default delay distance: where the Mains-only level has fallen 6 dB below the front-row target (inverse square) */
+  (function () {
+    var dls = ['dl', 'dr'].filter(function (k) { return out.rows[k].present && out.rows[k].autoDist; });
+    if (!dls.length) return;
+    var ms = [out.rows.l, out.rows.r].filter(function (r) { return r.present && r.spl1m != null; });
+    if (!ms.length) { dls.forEach(function (k) { flag('bad', names[k] + ' distance missing', 'Enter a distance, or add a FOH level so the default (where the Mains drop 6 dB below target) can be worked out.'); }); return; }
+    var m1 = 10 * Math.log10(ms.reduce(function (a, r) { return a + Math.pow(10, r.spl1m / 10); }, 0));
+    var d = Math.pow(10, (m1 - (target - 6)) / 20);
+    if (d < 1) { d = 1; flag('info', 'Default delay distance clamped to 1 m', 'The Mains are already 6 dB under target at 1 m. Enter the real delay position.'); }
+    dls.forEach(function (k) { var r = out.rows[k]; r.dist = d; r.pos = r.dir === 'behind' ? -d : d; });
+    dflt('Delay distance: ' + d.toFixed(1) + ' m, where the Mains-only level falls 6 dB below the ' + target + ' dB target (inverse square, free field). Enter the real position when known.');
+    if (i.far != null && d > i.far) flag('info', 'Delay default is beyond the furthest audience point', 'The Mains alone stay within 6 dB of target out to the back, so a delay may not be needed. Enter a distance if you still plan one.');
+  })();
   /* alignment reference: the cluster farthest from the listening position is the zero point (position = metres toward the audience, Mains = 0) */
   (function () {
-    var order = ['l', 'r', 'sub', 'ff', 'dl'], cand = order.filter(function (k) { return out.rows[k].present && out.rows[k].pos != null; });
+    var order = ['l', 'r', 'sub', 'ff', 'dl', 'dr'], grp = function (k) { return k === 'l' || k === 'r' ? 'm' : k === 'dl' || k === 'dr' ? 'd' : k; }, cand = order.filter(function (k) { return out.rows[k].present && out.rows[k].pos != null; });
     if (!cand.length) return;
     var auto = cand.reduce(function (b, k) { return out.rows[k].pos < out.rows[b].pos - 1e-9 ? k : b; }, cand[0]);
     var sel = i.alignRef || '', want = sel === 'mains' ? 'l' : sel, refK = auto;
@@ -418,7 +432,7 @@ function model(i) {
     out.alignRef = refK; out.alignName = mainsRef ? 'the Mains' : names[refK];
     cand.forEach(function (k) {
       var r = out.rows[k], dpos = r.pos - refPos;
-      r.isRef = Math.abs(dpos) < 1e-9 && (k === refK || (mainsRef && (k === 'l' || k === 'r')));
+      r.isRef = Math.abs(dpos) < 1e-9 && grp(k) === grp(refK);
       if (Math.abs(dpos) < 1e-9) r.delayMs = 0;
       else if (out.c != null) r.delayMs = (dpos / out.c) * 1000;
       if (r.delayMs != null && r.delayMs < -1e-9) flag('warn', names[k] + ' is farther than the chosen zero point', 'It would need a negative delay. Pick ' + names[k] + ' as the reference, or use Auto.');
@@ -438,7 +452,9 @@ function model(i) {
   out.far = i.far;
   if (i.far == null) flag('bad', 'Furthest audience point missing', 'Needed to estimate the Mains level at the back.');
   out.atFar = atD(out.mains, i.far);
-  out.delayDist = out.rows.dl.present ? out.rows.dl.dist : null;
+  var dAny = out.rows.dl.present ? out.rows.dl : out.rows.dr.present ? out.rows.dr : null;
+  out.dAny = dAny;
+  out.delayDist = dAny ? dAny.dist : null;
   out.atDelay = atD(out.mains, out.delayDist);
   if (out.mains != null && out.rows.sub.spl1m != null) out.subDiff = out.rows.sub.spl1m - out.mains;
   if (out.rows.ff.present && out.rows.ff.dist != null && out.rows.ff.dist < 1)
@@ -450,8 +466,8 @@ function model(i) {
     if (!sc.cfg || !sc.pat) flag('info', 'Sub setup incomplete', 'Set the sub configuration (L/R stacked with FOH, or mono center) and the pattern (omni, cardioid or end-fire). They do not change the level math, but they decide how you align and verify the subs. Not covered in AudioNinjaScrolls yet.');
     if (sc.pat === 'cardioid' || sc.pat === 'endfire') flag('info', 'Sub ' + PATN[sc.pat] + ' array', 'Align the array to the Mains as one source: leave its internal element delays and polarity alone and move the whole array. General practice, not from AudioNinjaScrolls.');
   }
-  if (out.atDelay != null && out.rows.dl.present)
-    flag('info', 'Delay Fill position', 'Mains-only level there is about ' + out.atDelay.toFixed(1) + ' dB. Compare with a live reading before trusting it.');
+  if (out.atDelay != null && dAny)
+    flag('info', 'Delay position', 'Mains-only level there is about ' + out.atDelay.toFixed(1) + ' dB. Compare with a live reading before trusting it.');
 
   if (i.venue === 'indoor') {
     var miss = (i.roomL == null || i.roomW == null || i.roomH == null);
@@ -492,13 +508,13 @@ function model(i) {
 (function () {
   var CL = [
     { k: 'l', name: 'FOH-L tops', cov: true }, { k: 'r', name: 'FOH-R tops', mirror: true, cov: true },
-    { k: 'ff', name: 'Center', dir: true, cov: true }, { k: 'sub', name: 'Subs', dir: true, sub: true }, { k: 'dl', name: 'Delay', cov: true }
+    { k: 'ff', name: 'Center', dir: true, cov: true }, { k: 'sub', name: 'Subs', dir: true, sub: true }, { k: 'dl', name: 'Delay L', cov: true }, { k: 'dr', name: 'Delay R', mirror2: true, cov: true }
   ];
-  var CLNAME = { l: 'FOH tops', r: 'FOH tops', ff: 'Center', sub: 'Subs', dl: 'Delay' };
+  var CLNAME = { l: 'FOH tops', r: 'FOH tops', ff: 'Center', sub: 'Subs', dl: 'Delay L', dr: 'Delay R' };
   var MATS = [['floor', 'Floor'], ['ceil', 'Ceiling'], ['stage', 'Stage wall'], ['back', 'Back wall'], ['left', 'Left wall'], ['right', 'Right wall']];
   var MOPT = [['concrete', 'Concrete'], ['glass', 'Glass'], ['tile', 'Tile'], ['brick', 'Brick'], ['drywall', 'Drywall'], ['wood', 'Wood'], ['curtain', 'Curtain'], ['panel', 'Acoustic panel'], ['open', 'Open or audience']];
   var DISTIDS = ['roomL', 'roomW', 'roomH', 'far', 'awidth', 'trim', 'spread', 'ff-dist', 'sub-dist', 'dl-dist'];
-  var CLK = ['l', 'r', 'ff', 'sub', 'dl'];
+  var CLK = ['l', 'r', 'ff', 'sub', 'dl', 'dr'];
   var $ = function (id) { return document.getElementById(id); };
   var KEY = 'ninja-step0-v1';
 
@@ -512,11 +528,11 @@ function model(i) {
   $('clusters').innerHTML = CL.map(function (c) {
     var k = c.k;
     var head = '<div class="cl-head"><span class="cl-name">' + c.name + '</span>' +
-      (c.mirror ? '<label class="chk" for="mirror"><input id="mirror" type="checkbox" checked> Same as FOH-L</label>' : '') + '</div>';
+      (c.mirror ? '<label class="chk" for="mirror"><input id="mirror" type="checkbox" checked> Same as FOH-L</label>' : '') + (c.mirror2 ? '<label class="chk" for="mirror2"><input id="mirror2" type="checkbox" checked> Same as Delay L (same distance too)</label>' : '') + '</div>';
     var mdl = '<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(12rem,1fr));margin-top:6px"><label class="f" for="' + k + '-model"><span>Speaker model</span><input id="' + k + '-model" type="text" autocomplete="off" placeholder="for the look-up"></label></div>' +
       '<div class="copyrow" style="margin:6px 0"><button type="button" class="cl-ask" data-k="' + k + '">Ask AI about this speaker</button><a id="' + k + '-web" class="btn" target="_blank" rel="noopener" hidden>Search the speaker</a></div>';
-    var dist = (k === 'l' || k === 'r') ? '' :
-      num(k + '-dist', 'Distance ahead of Mains') +
+    var dist = (k === 'l' || k === 'r' || k === 'dr') ? '' :
+      num(k + '-dist', k === 'dl' ? 'Distance ahead of Mains (blank = where Mains drop 6 dB)' : 'Distance ahead of Mains', k === 'dl' ? 'placeholder="auto"' : '') +
       (c.dir ? '<label class="f" for="' + k + '-dir"><span>Direction</span><select id="' + k + '-dir"><option value="ahead">Ahead</option><option value="behind">Behind</option></select></label>' : '');
     var cov = c.cov ? num(k + '-h', 'Horizontal coverage (deg)') + num(k + '-v', 'Vertical coverage (deg)') : '';
     var subx = c.sub ? sel('sub-cfg', 'Sub configuration', [['', 'Not set'], ['lr', 'L/R stacked'], ['mono', 'Mono center']]) + sel('sub-pat', 'Sub pattern', [['', 'Not set'], ['omni', 'Omni'], ['cardioid', 'Cardioid'], ['endfire', 'End-fire']]) : '';
@@ -532,7 +548,8 @@ function model(i) {
     'r-qty': 1, 'r-w': 650, 'r-sens': '', 'r-peak': 127, mirror: true,
     'ff-qty': 1, 'ff-w': 650, 'ff-sens': '', 'ff-peak': 127, 'ff-dist': 0.61, 'ff-dir': 'ahead',
     'sub-qty': 2, 'sub-w': 600, 'sub-sens': '', 'sub-peak': 130, 'sub-dist': 0.30, 'sub-dir': 'ahead', 'sub-cfg': 'lr', 'sub-pat': 'omni',
-    'dl-qty': 1, 'dl-w': 650, 'dl-sens': '', 'dl-peak': 127, 'dl-dist': 15.24
+    'dl-qty': 1, 'dl-w': 650, 'dl-sens': '', 'dl-peak': 127, 'dl-dist': 15.24,
+    'dr-qty': 1, 'dr-w': 650, 'dr-sens': '', 'dr-peak': 127, mirror2: true
   };
   CLK.forEach(function (k) { EXAMPLE[k + '-model'] = ''; if (k !== 'sub') { EXAMPLE[k + '-h'] = ''; EXAMPLE[k + '-v'] = ''; } });
   EXAMPLE.alignref = '';
@@ -551,13 +568,17 @@ function model(i) {
   var curD = 'm', curT = 'C';
 
   var mirrorSync = function () {
-    var on = $('mirror').checked;
-    ['qty', 'w', 'sens', 'peak', 'model', 'h', 'v'].forEach(function (f) {
-      var r = $('r-' + f), l = $('l-' + f); r.disabled = on;
-      if (on) { r.value = l.value; r.classList.toggle('lk', l.classList.contains('lk')); }
+    [['mirror', 'l', 'r'], ['mirror2', 'dl', 'dr']].forEach(function (p) {
+      var cb = $(p[0]); if (!cb) return;
+      var on = cb.checked;
+      ['qty', 'w', 'sens', 'peak', 'model', 'h', 'v'].forEach(function (f) {
+        var r = $(p[2] + '-' + f), l = $(p[1] + '-' + f); r.disabled = on;
+        if (on) { r.value = l.value; r.classList.toggle('lk', l.classList.contains('lk')); }
+      });
+      var rb = document.querySelector('#cl-' + p[2] + ' .cl-ask'); if (rb) rb.disabled = on;
+      var rw = $(p[2] + '-web'); if (rw && on) rw.hidden = true;
     });
-    var rb = document.querySelector('#cl-r .cl-ask'); if (rb) rb.disabled = on;
-    var rw = $('r-web'); if (rw && on) rw.hidden = true; else if (updateLinks) updateLinks();
+    if (updateLinks) updateLinks();
   };
 
   var val = function (id) { var v = $(id).value; if (v === '' || isNaN(+v)) return null; return +v; };
@@ -574,8 +595,14 @@ function model(i) {
       venue: $('venue').value, roomL: d('roomL'), roomW: d('roomW'), roomH: d('roomH'), mats: mats,
       temp: T, target: val('target'), far: d('far'), awidth: d('awidth'), seats: val('seats'),
       hAng: val('l-h'), vAng: val('l-v'), trim: d('trim'), spread: d('spread'), alignRef: $('alignref') ? $('alignref').value : '',
-      clusters: { l: cl('l', false), r: cl('r', false), ff: cl('ff', true), sub: cl('sub', true), dl: cl('dl', true) }
+      clusters: { l: cl('l', false), r: cl('r', false), ff: cl('ff', true), sub: cl('sub', true), dl: cl('dl', true), dr: cl('dr', false) }
     };
+  };
+  var read0 = read; read = function () {
+    var o = read0();
+    /* Delay R sits at the same distance as Delay L: one timing for the delay pair */
+    o.clusters.dr.dist = o.clusters.dl.dist; o.clusters.dr.dir = o.clusters.dl.dir;
+    return o;
   };
 
   var f1 = function (x) { return x == null ? '—' : x.toFixed(1); };
@@ -623,16 +650,16 @@ function model(i) {
     var kp = [
       ['Speed of sound', res.c == null ? '—' : res.c.toFixed(1), 'm/s', '331 + 0.6 × °C'],
       ['Mains at 1 m', f1(res.mains), 'dB', 'FOH-L + FOH-R, RMS'],
-      ['Delay Fill delay', res.rows.dl.present ? f2(res.rows.dl.delayMs) : '—', 'ms', 'estimate to verify'],
+      ['Delays L/R, delay', res.dAny ? f2(res.dAny.delayMs) : '—', 'ms', 'estimate to verify'],
       ['Mains at far point', f1(res.atFar), 'dB', 'vs target ' + sg(res.atFar == null ? null : res.atFar - res.target) + ' dB']
     ];
     var h = '<div class="kpis">' + kp.map(function (k) { return '<div class="kpi"><div class="l">' + k[0] + '</div><div class="v">' + k[1] + '<span class="u">' + k[2] + '</span></div><div class="s">' + k[3] + '</div></div>'; }).join('') + '</div>';
 
-    var rows = ['l', 'r', 'ff', 'sub', 'dl'].map(function (k) { return res.rows[k]; });
+    var rows = ['l', 'r', 'ff', 'sub', 'dl', 'dr'].map(function (k) { return res.rows[k]; });
     h += '<div class="card"><h2>Delay estimates</h2><div class="wrap"><table><thead><tr><th>Cluster</th><th class="n">Distance (' + unit + ')</th><th class="n">Delay (ms)</th><th>Note</th></tr></thead><tbody>' +
       rows.map(function (r) {
         if (!r.present) return '<tr><td>' + r.name + '</td><td class="n">—</td><td class="n">—</td><td>Not in rig</td></tr>';
-        var mn_ = (r.k === 'l' || r.k === 'r'), note = r.isRef ? 'Zero point (farthest from the listening position)' : mn_ ? 'Delayed to match ' + (res.alignName || 'the Mains') : r.k === 'dl' ? 'Optional 10 to 20 ms precedence offset is your call' : 'Delayed to match ' + (res.alignName || 'the Mains');
+        var mn_ = (r.k === 'l' || r.k === 'r'), note = r.isRef ? 'Zero point (farthest from the listening position)' : mn_ ? 'Delayed to match ' + (res.alignName || 'the Mains') : (r.k === 'dl' || r.k === 'dr') ? 'Optional 10 to 20 ms precedence offset is your call' : 'Delayed to match ' + (res.alignName || 'the Mains');
         return '<tr><td>' + r.name + '</td><td class="n">' + ((r.k === 'l' || r.k === 'r') ? '0' : dd(r.dist) + (r.dir === 'behind' ? ' behind' : '')) + '</td><td class="n">' + f2(r.delayMs) + '</td><td>' + note + '</td></tr>';
       }).join('') + '</tbody></table></div></div>';
 
@@ -645,7 +672,7 @@ function model(i) {
       }).join('') + '<tr><td><b>Mains combined</b></td><td class="n">' + f1(res.mains) + '</td><td class="n">—</td></tr></tbody></table></div>' +
       '<div class="wrap"><table><thead><tr><th>Mains-only position</th><th class="n">Distance (' + unit + ')</th><th class="n">SPL (dB)</th><th class="n">Vs target (dB)</th></tr></thead><tbody>' +
       '<tr><td>Furthest audience</td><td class="n">' + dd(res.far) + '</td><td class="n">' + f1(res.atFar) + '</td><td class="n">' + sg(res.atFar == null ? null : res.atFar - res.target) + '</td></tr>' +
-      (res.rows.dl.present ? '<tr><td>Delay Fill position</td><td class="n">' + dd(res.delayDist) + '</td><td class="n">' + f1(res.atDelay) + '</td><td class="n">' + sg(res.atDelay == null ? null : res.atDelay - res.target) + '</td></tr>' : '') +
+      (res.dAny ? '<tr><td>Delay position</td><td class="n">' + dd(res.delayDist) + '</td><td class="n">' + f1(res.atDelay) + '</td><td class="n">' + sg(res.atDelay == null ? null : res.atDelay - res.target) + '</td></tr>' : '') +
       '</tbody></table></div><p class="hint">Free-field inverse-square estimate: 20 log of the distance ratio below the 1 m level. Reflections and room gain will change the real figure.</p>' + chart(res, du, unit) + '</div>';
 
     var order = { bad: 0, warn: 1, info: 2 }, fl = res.flags.slice().sort(function (a, b) { return order[a.sev] - order[b.sev]; });
@@ -679,21 +706,21 @@ function model(i) {
   var sg2 = function (x) { return (x > 0 ? '+' : '') + x.toFixed(2); };
   var renderCal = function (res, inp, du, unit, dd) {
     var r = res.rows, t = res.target;
-    var pass = function (k, label, clip) { return r[k].present && r[k].delayMs != null ? '<li><b>' + label + '</b> (' + clip + '): Step 0 estimate ' + f2(r[k].delayMs) + ' ms' + (k === 'dl' ? ', plus your chosen precedence offset' : '') + '</li>' : ''; };
+    var pass = function (k, label, clip) { return r[k].present && r[k].delayMs != null ? '<li><b>' + label + '</b> (' + clip + '): Step 0 estimate ' + f2(r[k].delayMs) + ' ms' + ((k === 'dl' || k === 'dr') ? ', plus your chosen precedence offset' : '') + '</li>' : ''; };
     var h = '<h2>CalTemp: live calibration for this rig</h2><p class="hint">Follows the Ninja Calibration sequence exactly. No EQ before Steps 1 and 2 are confirmed. Never boost a null. Numbers from Step 0 are targets to validate, not final DSP values.</p>';
     h += '<div class="step"><h3>Step 1: Target SPL and headroom mapping</h3><ol>' +
       '<li>SPL meter on C-weighting, Slow response, at the mix position.</li><li>Measure and record ambient noise.</li>' +
       '<li>Play pink noise at unity gain (0 dBu analog, −18 dBFS digital).</li><li>Raise amp gain until the reading is ambient + 40 dB.</li><li>Pull output faders down 20 dB for nominal working level.</li></ol>' +
       (res.subDiff != null ? '<p class="note">Sub runs ' + sg(res.subDiff) + ' dB against the Mains at 1 m. Confirm that is intentional and set the relative trim here.</p>' : '') + '</div>';
     var refN = res.alignName || 'the Mains';
-    var passes = [['l', 'Mains', 'snare'], ['sub', r.sub.name, 'kick drum'], ['ff', 'Center', 'snare'], ['dl', 'Delay', 'snare']].map(function (p) { return [p[0], p[1] + ' to ' + (refN === 'the Mains' ? 'Main' : refN), p[2]]; }).filter(function (p) { var rr = r[p[0]]; if (p[0] === 'l' && !rr.present) rr = r.r; return rr.present && rr.delayMs != null && !rr.isRef; });
+    var passes = [['l', 'Mains', 'snare'], ['sub', r.sub.name, 'kick drum'], ['ff', 'Center', 'snare'], ['dl', 'Delay L/R', 'snare']].map(function (p) { var k = p[0]; if (k === 'l' && !r.l.present) k = 'r'; if (k === 'dl' && !r.dl.present) k = 'dr'; return [k, p[1] + ' to ' + (refN === 'the Mains' ? 'Main' : refN), p[2]]; }).filter(function (p) { var rr = r[p[0]]; return rr.present && rr.delayMs != null && !rr.isRef; });
     h += '<div class="step"><h3>Step 2: Time and phase alignment (waveform matching)</h3>' +
       '<p class="hint">Source: Ninja Calibration Step 2 and the Time Alignment Technique in AudioNinjaScrolls. One reference position, one pass per cluster, each against ' + (res.alignName || 'the Mains') + (res.alignName && res.alignName !== 'the Mains' ? ' (the cluster farthest from the listening position: zero delay).' : '.') + '</p>' +
       '<h4>Build the Reaper template (once, then reuse)</h4><p class="hint">From the Sound System Calibration book and the 00 Calibration Template.RPP. Skip if you already have the template.</p><ol>' +
       '<li>New project: 44.1 kHz or higher, 24-bit, ASIO driver on Windows or the audio driver on Mac.</li>' +
       '<li>Make a Tones folder track. Put Playback (any music with a good spread of frequencies), Pink Noise, Sine Sweep and a 1K Tone track inside it. Mute the three generators and add the generator plug-ins.</li>' +
       '<li>Make an RTA track for the mic: untick Master Send, record-enable it and turn on input monitoring.</li>' +
-      '<li>Make a Time Alignment folder with FOH L, FOH R, Subs, and Fill L and Fill R (the delay clusters, called Delay Fill here). Untick Master Send on the folder.</li>' +
+      '<li>Make a Time Alignment folder with FOH L, FOH R, Subs, and Fill L and Fill R (the Delay L and Delay R clusters). Untick Master Send on the folder.</li>' +
       '<li>Add ReaEQ to Tones and to RTA for the FFT view, then save it as a project template.</li></ol>' +
       '<h4>Set up the DAW (once)</h4><ol>' +
       '<li>Create a DAW template (for example in Reaper) with the phase correction plug-in on the mix bus.</li>' +
@@ -714,7 +741,7 @@ function model(i) {
       (passes.length ? '<div class="wrap"><table><thead><tr><th>Pass</th><th>Step 0 est. (ms)</th><th>Recorded (ms)</th><th>Diff (ms)</th></tr></thead><tbody>' +
         passes.map(function (p) {
           var k = p[0], mv = meas[k] == null ? '' : meas[k];
-          return '<tr><td>' + p[1] + (k === 'dl' ? ' (plus your precedence offset)' : '') + '<br><span class="hint">' + p[2] + ' clip</span></td><td>' + f2(r[k].delayMs) + '</td>' +
+          return '<tr><td>' + p[1] + ((k === 'dl' || k === 'dr') ? ' (plus your precedence offset)' : '') + '<br><span class="hint">' + p[2] + ' clip</span></td><td>' + f2(r[k].delayMs) + '</td>' +
             '<td><input class="meas" data-k="' + k + '" data-est="' + r[k].delayMs + '" type="number" step="0.01" inputmode="decimal" aria-label="Recorded offset in milliseconds, ' + p[1] + '" value="' + mv + '" style="width:5.5rem;max-width:100%"></td><td class="mdiff" id="md-' + k + '">' + mdiff(mv, r[k].delayMs) + '</td></tr>';
         }).join('') + '</tbody></table></div><p class="hint">Enter the offset you read from the recordings as a plain positive number of milliseconds. The difference is recorded minus estimate. These entries are not saved when the page closes.</p>' : '<p class="note">No cluster with a distance and level is entered yet, so there are no passes to list. Add a Center, Sub or Delay cluster in Inputs.</p>') +
       (inp.venue === 'indoor' && res.flags.some(function (f) { return f.title.indexOf('reflective') >= 0; }) ? '<p class="note">Reflective room: early reflections can fool the waveform nudge. Do not skip Step 3 validation.</p>' : '') + '</div>';
@@ -722,21 +749,21 @@ function model(i) {
       (res.cover && res.cover.dFull > 0 ? '<p class="note">Check the side areas inside ' + (res.cover.dFull / du).toFixed(1) + ' ' + unit + ' of the stage, where the Mains pattern does not yet reach the full width.</p>' : '') + '</div>';
     h += '<div class="step"><h3>Step 4: Playback and coverage verification</h3><ul>' +
       '<li><b>Front row:</b> at or under ' + t + ' dB SPL C' + (r.ff.present ? '. Trim the Center at the seat by ear and meter.' : '.') + '</li>' +
-      '<li><b>Middle row:</b> 6 dB below the front row' + (res.atDelay != null ? '. Mains-only estimate at the Delay Fill position is ' + f1(res.atDelay) + ' dB, so compare with a live reading.' : '.') + '</li>' +
+      '<li><b>Middle row:</b> 6 dB below the front row' + (res.atDelay != null ? '. Mains-only estimate at the Delay position is ' + f1(res.atDelay) + ' dB, so compare with a live reading.' : '.') + '</li>' +
       '<li><b>Back row:</b> at least 10 dB above the noise floor.</li>' +
-      '<li><b>Middle drop over 10 dB:</b> deploy the Delay Fill instead of pushing the FOH.</li></ul>' +
+      '<li><b>Middle drop over 10 dB:</b> deploy the delays instead of pushing the FOH.</li></ul>' +
       '<p class="hint">Only after this check are the final, validated delay values written to the speaker management DSP.</p></div>';
     h += '<div class="step"><h3>Pre-show sign-off</h3><ul class="signoff">' +
       ['Power and SPL: ambient measured, pink noise set, faders at nominal' + (res.subDiff != null ? ', sub and top differential confirmed' : ''),
        'Time alignment: every pass recorded and waveform-nudged',
        'Transfer function: variance accepted on all clusters, anything over 10 dB fixed by repositioning',
-       'Coverage audit: zone targets confirmed, Delay Fill timed if needed, DSP committed after sign-off'].map(function (s, n) { return '<li><label for="so' + n + '"><input type="checkbox" id="so' + n + '"> ' + s + '</label></li>'; }).join('') + '</ul></div>';
+       'Coverage audit: zone targets confirmed, Delay L/R timed if needed, DSP committed after sign-off'].map(function (s, n) { return '<li><label for="so' + n + '"><input type="checkbox" id="so' + n + '"> ' + s + '</label></li>'; }).join('') + '</ul></div>';
     $('caltemp').innerHTML = h;
   };
 
   /* events */
   var save = function () { try { localStorage.setItem(KEY, JSON.stringify(getAll())); } catch (e) {} };
-  var onChange = function () { if ($('mirror').checked) mirrorSync(); render(); save(); };
+  var onChange = function () { if ($('mirror').checked || $('mirror2').checked) mirrorSync(); render(); save(); };
   document.addEventListener('input', function (e) {
     var t = e.target;
     if (!t.closest('#inputs') || t.tagName === 'TEXTAREA') return;
@@ -771,7 +798,7 @@ function model(i) {
   $('btn-example').addEventListener('click', function () { setAll(EXAMPLE); curD = 'm'; curT = 'C'; mirrorSync(); render(); save(); });
   $('btn-clear').addEventListener('click', function () {
     var blank = {}; ids.forEach(function (id) { blank[id] = ''; });
-    blank.venue = 'indoor'; blank.mirror = true; blank['ff-dir'] = 'ahead'; blank['sub-dir'] = 'ahead'; CLK.forEach(function (k) { blank[k + '-qty'] = '1'; });
+    blank.venue = 'indoor'; blank.mirror = true; blank.mirror2 = true; blank['ff-dir'] = 'ahead'; blank['sub-dir'] = 'ahead'; CLK.forEach(function (k) { blank[k + '-qty'] = '1'; });
     MATS.forEach(function (m) { blank['mat-' + m[0]] = 'concrete'; });
     blank.dunit = $('dunit').value; blank.tunit = $('tunit').value;
     setAll(blank); mirrorSync(); render(); save();
@@ -815,7 +842,7 @@ function model(i) {
     }
     CLK.forEach(function (k) {
       var sp = $(k + '-model').value.trim(), a = $(k + '-web');
-      a.hidden = !sp || (k === 'r' && $('mirror').checked);
+      a.hidden = !sp || (k === 'r' && $('mirror').checked) || (k === 'dr' && $('mirror2').checked);
       if (sp) a.href = 'https://www.google.com/search?q=' + encodeURIComponent(sp + (k === 'sub' ? ' specifications sensitivity max SPL' : ' specifications sensitivity max SPL horizontal vertical coverage'));
     });
   };
@@ -861,7 +888,8 @@ function model(i) {
       (o.coverage && (o.coverage.horizontal_deg != null || o.coverage.vertical_deg != null));
     var k = null;
     if (hasSpk) {
-      k = ['l', 'ff', 'sub', 'dl'].indexOf(o.cluster) >= 0 ? o.cluster : (target && target !== 'venue' ? (target === 'r' ? 'l' : target) : lastTarget && lastTarget !== 'venue' ? (lastTarget === 'r' ? 'l' : lastTarget) : 'l');
+      var mp = function (x) { return x === 'r' ? 'l' : x === 'dr' ? 'dl' : x; };
+      k = ['l', 'ff', 'sub', 'dl'].indexOf(o.cluster) >= 0 ? o.cluster : (target && target !== 'venue' ? mp(target) : lastTarget && lastTarget !== 'venue' ? mp(lastTarget) : 'l');
       var nm = CLNAME[k] + ': ';
       /* stale lookup-filled values from an earlier model must not survive a new lookup; typed values do */
       ['w', 'sens', 'peak', 'h', 'v', 'cfg', 'pat'].forEach(function (f) { var e = $(k + '-' + f); if (e && e.classList.contains('lk')) { e.value = ''; e.classList.remove('lk'); } });
@@ -913,7 +941,7 @@ function model(i) {
       var mt = $(target + '-model') ? $(target + '-model').value : '', hit = modelFind(mt);
       if (hit) {
         lastTarget = target;
-        var tk = target === 'r' ? 'l' : target;
+        var tk = target === 'r' ? 'l' : target === 'dr' ? 'dl' : target;
         $(tk + '-model').value = hit.b + ' ' + hit.m;
         var nloc = applyLookup(modelToLookup(hit, tk), target);
         $('btn-undo').hidden = !nloc;
@@ -950,7 +978,7 @@ function model(i) {
 
 
   /* updates */
-  var APP_VERSION = '1.8.0', DEFAULT_UPDATE_URL = 'https://raw.githubusercontent.com/AudioninjaProductions/audioninja-step0/main/version.json', UK = 'ninja-upd-v1';
+  var APP_VERSION = '1.9.1', DEFAULT_UPDATE_URL = 'https://raw.githubusercontent.com/AudioninjaProductions/audioninja-step0/main/version.json', UK = 'ninja-upd-v1';
   var updUrl = DEFAULT_UPDATE_URL;
   try { var us = localStorage.getItem(UK); if (us) updUrl = us; } catch (e) {}
   $('verNow').textContent = APP_VERSION; $('updUrl').value = updUrl;
@@ -1241,7 +1269,7 @@ function model(i) {
 
   /* one request for venue + sound system, and a parser that fills the venue and every cluster in one go */
   var CKEY = { l: 'l', left: 'l', foh_l: 'l', foh_left: 'l', main_left: 'l', mains: 'l', main: 'l', tops: 'l', foh: 'l', foh_tops: 'l', r: 'r', right: 'r', foh_r: 'r', foh_right: 'r', main_right: 'r',
-    ff: 'ff', center: 'ff', centre: 'ff', center_cluster: 'ff', front_fill: 'ff', fill: 'ff', sub: 'sub', subs: 'sub', subwoofer: 'sub', subwoofers: 'sub', dl: 'dl', delay: 'dl', delays: 'dl', delay_fill: 'dl', delay_fills: 'dl', delay_cluster: 'dl' };
+    ff: 'ff', center: 'ff', centre: 'ff', center_cluster: 'ff', front_fill: 'ff', fill: 'ff', sub: 'sub', subs: 'sub', subwoofer: 'sub', subwoofers: 'sub', dl: 'dl', delay: 'dl', delays: 'dl', delay_fill: 'dl', delay_fills: 'dl', delay_cluster: 'dl', dr: 'dr', delay_r: 'dr', delay_right: 'dr', fill_r: 'dr', fill_right: 'dr', delay_fill_r: 'dr', delay_fill_right: 'dr', dl_r: 'dr', delay_l: 'dl', delay_left: 'dl', fill_l: 'dl', fill_left: 'dl', delay_fill_l: 'dl', delay_fill_left: 'dl' };
   var CSCHEMA = '{"speaker_model":"brand and model","quantity":0,"rms_watts":0,"sensitivity_db":0,"peak_spl_db":0,"horizontal_deg":0,"vertical_deg":0}';
   var FULLSCHEMA = '{"venue":"name","type":"indoor or outdoor","room_length_m":0,"room_width_m":0,"ceiling_height_m":0,"audience_width_m":0,"furthest_audience_m":0,"capacity":0,"trim_height_m":0,"foh_spread_m":0,' +
     '"boundaries":{"floor":"","ceiling":"","stage":"","back":"","left":"","right":""},' +
@@ -1256,7 +1284,7 @@ function model(i) {
       'Sound system: ' + (sh ? 'I want to use: ' + sh + '. Use exactly these models, and look up their specs.' : 'find the venue\'s installed house sound system, if one is published.') + '\n\n' +
       'Do this with web search:\n' +
       '1. VENUE. If this names a specific venue, find it. If it only describes a type of venue, choose one well documented example, name it in "venue", and say so in "notes". Find room dimensions, ceiling height, audience area, capacity and the main wall, floor and ceiling materials. If the venue is a standard court and only the court type is known, use the published standard court size and mark it "estimated".\n' +
-      '2. SOUND SYSTEM. Find the speakers by position: "l" = main left/right hang or stack (give quantity PER SIDE; leave out "r", the app mirrors it), "ff" = center cluster, "sub" = subwoofers (total quantity, "config" = lr if stacked with the mains or mono if one center cluster, "pattern" only if published as omni, cardioid or endfire), "dl" = delay or fill speakers. Leave out any position the venue does not have.\n' +
+      '2. SOUND SYSTEM. Find the speakers by position: "l" = main left/right hang or stack (give quantity PER SIDE; leave out "r", the app mirrors it), "ff" = center cluster, "sub" = subwoofers (total quantity, "config" = lr if stacked with the mains or mono if one center cluster, "pattern" only if published as omni, cardioid or endfire), "dl" = delay or fill speakers (give quantity PER SIDE; leave out "dr", the app mirrors the left delay to the right delay at the same distance, and the same applies if there is only one delay position). Leave out any position the venue does not have.\n' +
       '3. SPECS. For each position use only the manufacturer\'s published specification of one speaker: rms_watts = continuous (RMS or AES) power in watts, sensitivity_db = dB SPL at 1 W and 1 m, peak_spl_db = maximum peak SPL at 1 m, horizontal_deg and vertical_deg = nominal coverage angles (leave out for subs).\n\n' +
       'Rules: reply with ONE JSON block only, no other text. Meters for every length. Numbers must be plain numbers, not text. Leave out anything you cannot find and never guess. Put a source URL for each value in "sources" and mark each "stated" or "estimated". Allowed boundary values: ' + MATKEYS.join(', ') + '.\n' +
       'Shape: ' + FULLSCHEMA;
@@ -1282,7 +1310,8 @@ function model(i) {
     var done_ = {};
     list.forEach(function (pr) {
       var k = ckey(pr[0]);
-      if (!k || k === 'r' || done_[k] || !$(k + '-model')) return; done_[k] = 1;
+      if (k === 'dr' && !list.some(function (x) { return ckey(x[0]) === 'dl'; })) k = 'dl';
+      if (!k || k === 'r' || k === 'dr' || done_[k] || !$(k + '-model')) return; done_[k] = 1;
       var c = normLookup(pr[1]), hit = typeof c.speaker_model === 'string' && c.speaker_model.trim() ? modelFind(c.speaker_model) : null, q = toNum(c.quantity != null ? c.quantity : c.qty != null ? c.qty : c.count, 'quantity');
       var body = hit ? modelToLookup(hit, k) : c;
       if (hit) { $(k + '-model').value = hit.b + ' ' + hit.m; if (!body.pattern && typeof c.pattern === 'string') body.pattern = c.pattern; }
@@ -1316,6 +1345,7 @@ function model(i) {
     if (CKEY[n]) return CKEY[n];
     var t = String(s).toLowerCase();
     if (/sub|low.?freq|bass/.test(t)) return 'sub';
+    if (/delay|fill/.test(t) && !/cent|front|left/.test(t) && /right|\br\b/.test(t)) return 'dr';
     if (/delay/.test(t)) return 'dl';
     if (/cent(er|re)|front.?fill|\bff\b|fill/.test(t)) return 'ff';
     if (/main|foh|house|\btops?\b|\bleft\b|\bl\b|hang|array|line/.test(t)) return 'l';
