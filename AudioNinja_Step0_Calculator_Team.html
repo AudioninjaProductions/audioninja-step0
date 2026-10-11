@@ -412,7 +412,7 @@ function model(i) {
   var sp = [CFGN[i.clusters.sub.cfg], PATN[i.clusters.sub.pat]].filter(Boolean);
   var names = { l: 'FOH-L', r: 'FOH-R', ff: 'Center', sub: sp.length ? 'Sub (' + sp.join(', ') + ')' : 'Sub', dl: 'Delay L', dr: 'Delay R' };
   ['l', 'r', 'ff', 'sub', 'dl', 'dr'].forEach(function (k) {
-    if (k === 'sub' && (i.app === 'full' || !i.app) && present(i.clusters.sub, 'sub') && i.clusters.sub.cfg === 'lr' && i.clusters.sub.dist == null) { i.clusters.sub.dist = 0; dflt('Sub distance: 0 (L/R stacked with FOH, so the subs sit at the Mains reference).'); }
+    if (k === 'sub' && (i.app === 'full' || !i.app) && present(i.clusters.sub, 'sub') && i.clusters.sub.cfg === 'lr' && i.clusters.sub.dist == null) { i.clusters.sub.dist = 0; dflt('Sub distance: 0 (L/R stacked with FOH, so the subs sit at the Mains reference).'); flag('info', 'Sub distance assumed 0', 'Subs are L/R stacked, so they are placed at the Mains line with zero offset. If they sit ahead of or behind the tops, enter the distance and direction, because it sets their delay.'); }
     var cl = i.clusters[k], row = { k: k, name: names[k], present: present(cl, k), spl1m: null, delayMs: null, dist: cl.dist, dir: cl.dir, behind: false, how: null };
     if (row.present) {
       var box = null;
@@ -422,7 +422,7 @@ function model(i) {
       else row.spl1m = box + 10 * Math.log10(cl.qty);
       if (k === 'l' || k === 'r') row.pos = 0;
       else if (cl.dist == null && (k === 'dl' || k === 'dr' || k === 'ff')) row.autoDist = true;
-      else if (cl.dist == null) flag('bad', names[k] + ' distance missing', 'A delay estimate needs the distance from the Mains.');
+      else if (cl.dist == null && !(k === 'sub' && (i.app === 'acoustic' || i.app === 'speech'))) flag('bad', names[k] + ' distance missing', 'A delay estimate needs the distance from the Mains.');
       else row.pos = cl.dir === 'behind' ? -cl.dist : cl.dist;
     }
     out.rows[k] = row;
@@ -725,7 +725,7 @@ function model(i) {
     h += '<div class="card"><h2>Delay estimates</h2><div class="wrap"><table><thead><tr><th>Cluster</th><th class="n">Distance (' + unit + ')</th><th class="n">Delay (ms)</th><th>Note</th></tr></thead><tbody>' +
       rows.map(function (r) {
         if (!r.present) return '<tr><td>' + r.name + '</td><td class="n">—</td><td class="n">—</td><td>' + (r.autoOff ? r.autoNote : 'Not in rig') + '</td></tr>';
-        var mn_ = (r.k === 'l' || r.k === 'r'), note = r.isRef ? 'Zero point (farthest from the listening position)' : mn_ ? 'Delayed to match ' + (res.alignName || 'the Mains') : (r.k === 'dl' || r.k === 'dr') ? 'Optional 10 to 20 ms precedence offset is your call' : 'Delayed to match ' + (res.alignName || 'the Mains');
+        var mn_ = (r.k === 'l' || r.k === 'r'), note = r.delayMs == null ? 'Needs a distance from the Mains' : r.isRef ? 'Zero point (farthest from the listening position)' : mn_ ? 'Delayed to match ' + (res.alignName || 'the Mains') : (r.k === 'dl' || r.k === 'dr') ? 'Optional 10 to 20 ms precedence offset is your call' : 'Delayed to match ' + (res.alignName || 'the Mains');
         return '<tr><td>' + r.name + '</td><td class="n">' + ((r.k === 'l' || r.k === 'r') ? '0' : dd(r.dist) + (r.dir === 'behind' ? ' behind' : '')) + '</td><td class="n">' + f2(r.delayMs) + '</td><td>' + note + '</td></tr>';
       }).join('') + '</tbody></table></div></div>';
 
@@ -779,6 +779,10 @@ function model(i) {
     var r = res.rows, t = res.target;
     var pass = function (k, label, clip) { return r[k].present && r[k].delayMs != null ? '<li><b>' + label + '</b> (' + clip + '): Step 0 estimate ' + f2(r[k].delayMs) + ' ms' + ((k === 'dl' || k === 'dr') ? ', plus your chosen precedence offset' : '') + '</li>' : ''; };
     var h = '<h2>CalTemp: live calibration for this rig</h2><p class="hint">Follows the Ninja Calibration sequence exactly. No EQ before Steps 1 and 2 are confirmed. Never boost a null. Numbers from Step 0 are targets to validate, not final DSP values.</p>';
+    h += '<div class="note" style="margin:10px 0;font-size:14px"><b>Before you start calibrating: clean I/O.</b><ul style="margin:6px 0 0;padding-left:20px">' +
+      '<li>Make sure the I/O has <b>no processing and is zeroed out</b>: the RTA channel and everything downstream of it, the output matrices and the auxes, with <b>no compression, no EQ and no delay compensation</b>.</li>' +
+      '<li>Make sure the <b>RTAs are not routed to any output</b>. They are for measuring only.</li></ul>' +
+      '<span class="hint">Source: Bone\'s working method. The Scrolls say to disable the RTA output routing; the zeroed-processing check is not yet written there, so AudioNinjaScrolls may need updating.</span></div>';
     h += '<div class="step"><h3>Step 1: Target SPL and headroom mapping</h3><ol>' +
       '<li>SPL meter on C-weighting, Slow response, at the mix position.</li><li>Measure and record ambient noise.</li>' +
       '<li>Play pink noise at unity gain (0 dBu analog, −18 dBFS digital).</li><li>Raise amp gain until the reading is ambient + 40 dB.</li><li>Pull output faders down 20 dB for nominal working level.</li></ol>' +
@@ -1049,7 +1053,7 @@ function model(i) {
 
 
   /* updates */
-  var APP_VERSION = '1.14.0', DEFAULT_UPDATE_URL = 'https://raw.githubusercontent.com/AudioninjaProductions/audioninja-step0/main/version.json', UK = 'ninja-upd-v1';
+  var APP_VERSION = '1.14.2', DEFAULT_UPDATE_URL = 'https://raw.githubusercontent.com/AudioninjaProductions/audioninja-step0/main/version.json', UK = 'ninja-upd-v1';
   var updUrl = DEFAULT_UPDATE_URL;
   try { var us = localStorage.getItem(UK); if (us) updUrl = us; } catch (e) {}
   $('verNow').textContent = APP_VERSION; $('updUrl').value = updUrl;

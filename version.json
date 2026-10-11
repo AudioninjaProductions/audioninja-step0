@@ -1,5 +1,5 @@
 {
-  "version": "1.14.0",
+  "version": "1.14.2",
   "url": "https://github.com/AudioninjaProductions/audioninja-step0/blob/main/AudioNinja_Step0_Calculator_Team.html",
-  "notes": "Mains-only SPL at the front row, middle row and furthest point, with reference distance fields and the drop against the front row. Flags a middle row drop over 10 dB."
+  "notes": "CalTemp now opens with a highlighted pre-calibration note: clean, zeroed I/O and RTAs routed for measuring only."
 }

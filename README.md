@@ -69,6 +69,8 @@ To update it: edit `brands.json` on GitHub, add brands in the same shape (`n` na
 
 ## Version history
 
+- **1.14.2** CalTemp starts with a highlighted "Before you start calibrating" note: I/O with no processing and zeroed (RTA channel and downstream output matrices and auxes: no compression, EQ or delay compensation), and RTAs not routed to any output.
+- **1.14.1** Sub distance: L/R stacked subs with a blank distance now raise a visible note (assumed 0), the missing-distance flag no longer fires when the subs are off for acoustic or speech, and the delay table says "Needs a distance from the Mains" when a distance is missing.
 - **1.14.0** Coverage SPL table: Mains-only estimate at the front row, middle row and furthest point, each with the difference against target and against the front row. New Middle row distance field (blank = midway between front row and furthest point). Flags a middle row drop over 10 dB (Ninja Calibration Step 4).
 - **1.13.1** Front row SPL: the Mains-only estimate at the front row distance (blank = 2 m, listed under Defaults) appears in the position table and the summary, with the difference against target.
 - **1.13.0** Standard Lookup entry: one box with Venue, Sound system, Application and Delay approach lines (reset by Clear all). Ask AI reads it, fills every speaker found in the built-in table immediately (no separate fill button), then builds the AI request including the application. The selectors and the lines stay in sync.
